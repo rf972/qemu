@@ -757,6 +757,7 @@ static void smp_parse(MachineState *ms, QemuOpts *opts)
                         sockets, cores, threads,
                         ms->smp.max_cpus);
         }
+	assert(ms->smp.max_cpus <= CPU_LOCK_BITMAP_SIZE);
 
         ms->smp.cpus = cpus;
         ms->smp.cores = cores;
