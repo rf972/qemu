@@ -447,7 +447,7 @@ int hvf_process_events(CPUState *cpu_state)
 
     interrupt_request = cpu_interrupt_request(cpu_state);
     if (((interrupt_request & CPU_INTERRUPT_HARD) &&
-        (env->eflags & IF_MASK)) ||
+        (EFLAGS(env) & IF_MASK)) ||
         (interrupt_request & CPU_INTERRUPT_NMI)) {
         cpu_halted_set(cpu_state, 0);
     }
