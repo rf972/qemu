@@ -451,7 +451,7 @@ void x86_cpu_dump_state(CPUState *cs, FILE *f, int flags)
                      (env->hflags >> HF_INHIBIT_IRQ_SHIFT) & 1,
                      (env->a20_mask >> 20) & 1,
                      (env->hflags >> HF_SMM_SHIFT) & 1,
-                     cs->halted);
+                    cpu_halted(cs));
     } else
 #endif
     {
@@ -478,7 +478,7 @@ void x86_cpu_dump_state(CPUState *cs, FILE *f, int flags)
                      (env->hflags >> HF_INHIBIT_IRQ_SHIFT) & 1,
                      (env->a20_mask >> 20) & 1,
                      (env->hflags >> HF_SMM_SHIFT) & 1,
-                     cs->halted);
+                    cpu_halted(cs));
     }
 
     for(i = 0; i < 6; i++) {
