@@ -55,8 +55,15 @@ static void cpu_throttle_thread(CPUState *cpu, run_on_cpu_data opaque)
     endtime_ns = qemu_clock_get_ns(QEMU_CLOCK_REALTIME) + sleeptime_ns;
     while (sleeptime_ns > 0 && !cpu->stop) {
         if (sleeptime_ns > SCALE_MS) {
-            qemu_cond_timedwait_iothread(cpu->halt_cond,
-                                         sleeptime_ns / SCALE_MS);
+            if (!cpu_mutex_locked(cpu)) {
+                cpu_mutex_lock(cpu);
+                qemu_cond_timedwait(cpu->halt_cond, cpu->lock,
+                                    sleeptime_ns / SCALE_MS);
+                cpu_mutex_unlock(cpu);
+            } else {
+                qemu_cond_timedwait(cpu->halt_cond, cpu->lock,
+                                    sleeptime_ns / SCALE_MS);
+            }
         } else {
             qemu_mutex_unlock_iothread();
             g_usleep(sleeptime_ns / SCALE_US);
