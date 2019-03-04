@@ -2042,13 +2042,13 @@ static void handle_query_thread_extra(GdbCmdContext *gdb_ctx, void *user_ctx)
         char *cpu_name = object_get_canonical_path_component(OBJECT(cpu));
         len = snprintf((char *)gdb_ctx->mem_buf, sizeof(gdb_ctx->str_buf) / 2,
                        "%s %s [%s]", cpu_model, cpu_name,
-                       cpu->halted ? "halted " : "running");
+                                   cpu_halted(cpu) ? "halted " : "running");
         g_free(cpu_name);
     } else {
         /* memtohex() doubles the required space */
         len = snprintf((char *)gdb_ctx->mem_buf, sizeof(gdb_ctx->str_buf) / 2,
                         "CPU#%d [%s]", cpu->cpu_index,
-                        cpu->halted ? "halted " : "running");
+                                   cpu_halted(cpu) ? "halted " : "running");
     }
     trace_gdbstub_op_extra_info((char *)gdb_ctx->mem_buf);
     memtohex(gdb_ctx->str_buf, gdb_ctx->mem_buf, len);
