@@ -8574,7 +8574,7 @@ static bool cpu_has_work_POWER7(CPUState *cs)
     PowerPCCPU *cpu = POWERPC_CPU(cs);
     CPUPPCState *env = &cpu->env;
 
-    if (cs->halted) {
+    if (cpu_halted(cs)) {
         if (!(cs->interrupt_request & CPU_INTERRUPT_HARD)) {
             return false;
         }
@@ -8731,7 +8731,7 @@ static bool cpu_has_work_POWER8(CPUState *cs)
     PowerPCCPU *cpu = POWERPC_CPU(cs);
     CPUPPCState *env = &cpu->env;
 
-    if (cs->halted) {
+    if (cpu_halted(cs)) {
         if (!(cs->interrupt_request & CPU_INTERRUPT_HARD)) {
             return false;
         }
@@ -8927,7 +8927,7 @@ static bool cpu_has_work_POWER9(CPUState *cs)
     PowerPCCPU *cpu = POWERPC_CPU(cs);
     CPUPPCState *env = &cpu->env;
 
-    if (cs->halted) {
+    if (cpu_halted(cs)) {
         uint64_t psscr = env->spr[SPR_PSSCR];
 
         if (!(cs->interrupt_request & CPU_INTERRUPT_HARD)) {
@@ -9137,7 +9137,7 @@ static bool cpu_has_work_POWER10(CPUState *cs)
     PowerPCCPU *cpu = POWERPC_CPU(cs);
     CPUPPCState *env = &cpu->env;
 
-    if (cs->halted) {
+    if (cpu_halted(cs)) {
         uint64_t psscr = env->spr[SPR_PSSCR];
 
         if (!(cs->interrupt_request & CPU_INTERRUPT_HARD)) {
