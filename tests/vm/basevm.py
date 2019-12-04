@@ -126,7 +126,7 @@ class BaseVM(object):
                    "-t",
                    "-o", "StrictHostKeyChecking=no",
                    "-o", "UserKnownHostsFile=" + os.devnull,
-                   "-o", "ConnectTimeout=1",
+                   "-o", "ConnectTimeout=10",
                    "-p", self.ssh_port, "-i", self._ssh_key_file]
         # In debug mode, show output of commands.
         if not self.debug:
