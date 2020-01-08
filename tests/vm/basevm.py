@@ -309,11 +309,15 @@ class BaseVM(object):
     def print_step(self, text):
         sys.stderr.write("### %s ...\n" % text)
 
-    def wait_ssh(self, seconds=600):
+    def wait_ssh(self, wait_root=False, seconds=600):
         starttime = datetime.datetime.now()
         endtime = starttime + datetime.timedelta(seconds=seconds)
         guest_up = False
         while datetime.datetime.now() < endtime:
+            if wait_root:
+                if self.ssh_root("exit 0") == 0:
+                    guest_up = True
+                    break
             if self.ssh("exit 0") == 0:
                 guest_up = True
                 break
