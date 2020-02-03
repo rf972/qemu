@@ -31,6 +31,7 @@ import tempfile
 import shutil
 import multiprocessing
 import traceback
+from socket_thread import SocketThread
 
 SSH_KEY = open(os.path.join(os.path.dirname(__file__),
                "..", "keys", "id_rsa")).read()
@@ -63,8 +64,11 @@ class BaseVM(object):
     # 4 is arbitrary, but greater than 2,
     # since we found we need to wait more than twice as long.
     tcg_ssh_timeout_multiplier = 4
+    console_logfile = "console.log"
     def __init__(self, debug=False, vcpus=None):
         self._guest = None
+        self._console_fd = None
+        self._socket_thread = None
         self._tmpdir = os.path.realpath(tempfile.mkdtemp(prefix="vm-test-",
                                                          suffix=".tmp",
                                                          dir="."))
@@ -179,6 +183,17 @@ class BaseVM(object):
                             "-device",
                             "virtio-blk,drive=%s,serial=%s,bootindex=1" % (name, name)]
 
+    def init_console(self, socket):
+        """Init the thread to dump console to a file.
+           Also open the file descriptor we will use to
+           read from the console."""
+        console_log_path = os.path.join(self._tmpdir, self.console_logfile)
+        self._socket_thread = SocketThread(socket,
+                                           console_log_path)
+        self._console_fd = open(console_log_path, "r")
+        self._socket_thread.start()
+        print("console logfile is: {}".format(console_log_path))
+
     def boot(self, img, extra_args=[]):
         args = self._args + [
             "-device", "VGA",
@@ -201,6 +216,7 @@ class BaseVM(object):
             raise
         atexit.register(self.shutdown)
         self._guest = guest
+        self.init_console(guest.console_socket)
         usernet_info = guest.qmp("human-monitor-command",
                                  command_line="info usernet")
         self.ssh_port = None
@@ -230,12 +246,22 @@ class BaseVM(object):
             # log console line
             sys.stderr.write("con recv: %s\n" % line)
 
+    def console_recv(self, n):
+        """Read n chars from the console_logfile being dumped to
+           by the socket thread we created earlier."""
+        while True:
+            data = self._console_fd.read(1)
+            if data != "":
+                break
+            time.sleep(0.1)
+        return data.encode('latin1')
+
     def console_wait(self, expect, expectalt = None):
         vm = self._guest
         output = ""
         while True:
             try:
-                chars = vm.console_socket.recv(1)
+                chars = self.console_recv(1)
             except socket.timeout:
                 sys.stderr.write("console: *** read timeout ***\n")
                 sys.stderr.write("console: waiting for: '%s'\n" % expect)
@@ -335,6 +361,8 @@ class BaseVM(object):
             raise Exception("Timeout while waiting for guest ssh")
 
     def shutdown(self):
+        self._socket_thread.join()
+        self._console_fd.close()
         self._guest.shutdown()
     def wait(self):
         self._guest.wait()
