@@ -2,9 +2,12 @@
 
 .PHONY: vm-build-all vm-clean-all
 
-IMAGES := freebsd netbsd openbsd centos fedora
+IMAGES := freebsd netbsd openbsd fedora
 ifneq ($(GENISOIMAGE),)
 IMAGES += ubuntu.i386 centos
+ifneq ($(QEMU_EFI_AARCH64),)
+IMAGES += ubuntu.aarch64 centos.aarch64
+endif
 endif
 
 IMAGES_DIR := $(HOME)/.cache/qemu-vm/images
@@ -23,6 +26,12 @@ vm-help vm-test:
 ifneq ($(GENISOIMAGE),)
 	@echo "  vm-build-centos                 - Build QEMU in CentOS VM, with Docker"
 	@echo "  vm-build-ubuntu.i386            - Build QEMU in ubuntu i386 VM"
+ifneq ($(QEMU_EFI_AARCH64),)
+	@echo "  vm-build-ubuntu.aarch64         - Build QEMU in ubuntu aarch64 VM"
+	@echo "  vm-build-centos.aarch64         - Build QEMU in CentOS aarch64 VM"
+else
+	@echo "  (install qemu-efi-aarch64 to build centos/ubuntu aarch64 images.)"
+endif
 else
 	@echo "  (install genisoimage to build centos/ubuntu images)"
 endif
@@ -46,17 +55,30 @@ endif
 	@echo "    QEMU_LOCAL=1                 - Use QEMU binary local to this build."
 	@echo "    QEMU=/path/to/qemu		 - Change path to QEMU binary"
 	@echo "    QEMU_IMG=/path/to/qemu-img	 - Change path to qemu-img tool"
+ifeq ($(PYTHON_YAML),yes)
 	@echo "    QEMU_CONFIG=/path/conf.yml   - Change path to VM configuration .yml file."
+else
+	@echo "    (install python3-yaml to enable support for yaml file to configure a VM.)"
+endif
 	@echo "                                   See conf_example_*.yml for file format details."
 
 vm-build-all: $(addprefix vm-build-, $(IMAGES))
 
 vm-clean-all:
 	rm -f $(IMAGE_FILES)
+	
+define validate_target
+	@echo $(1) | grep $(2) 1> /dev/null || \
+	(echo "Invalid target $(2)" ; \
+	echo Valid Targets are: $(1) ; \
+	echo "See make vm-help for more info \
+	on what to install to enable this target"; exit 1;)
+endef
 
 $(IMAGES_DIR)/%.img:	$(SRC_PATH)/tests/vm/% \
 			$(SRC_PATH)/tests/vm/basevm.py \
 			$(SRC_PATH)/tests/vm/Makefile.include
+	$(call validate_target,${IMAGES},$*)
 	@mkdir -p $(IMAGES_DIR)
 	$(call quiet-command, \
 		$(PYTHON) $< \
@@ -72,6 +94,7 @@ $(IMAGES_DIR)/%.img:	$(SRC_PATH)/tests/vm/% \
 
 # Build in VM $(IMAGE)
 vm-build-%: $(IMAGES_DIR)/%.img
+	$(call validate_target,${IMAGES},$*)
 	$(call quiet-command, \
 		$(PYTHON) $(SRC_PATH)/tests/vm/$* \
 		$(if $(V)$(DEBUG), --debug) \
@@ -90,6 +113,7 @@ vm-build-%: $(IMAGES_DIR)/%.img
 		"  VM-BUILD $*")
 
 vm-boot-serial-%: $(IMAGES_DIR)/%.img
+	$(call validate_target,${IMAGES},$*)
 	qemu-system-x86_64 -enable-kvm -m 4G -smp 2 -nographic \
 		-drive if=none,id=vblk,cache=writeback,file="$<" \
 		-netdev user,id=vnet \
@@ -98,6 +122,7 @@ vm-boot-serial-%: $(IMAGES_DIR)/%.img
 	|| true
 
 vm-boot-ssh-%: $(IMAGES_DIR)/%.img
+	$(call validate_target,${IMAGES},$*)
 	$(call quiet-command, \
 		$(PYTHON) $(SRC_PATH)/tests/vm/$* \
 		$(if $(J),--jobs $(J)) \
