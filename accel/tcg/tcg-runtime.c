@@ -171,7 +171,7 @@ void HELPER(exit_atomic)(CPUArchState *env)
 
 void HELPER(cpu_halted_set)(CPUArchState *env, uint32_t val)
 {
-    CPUState *cpu = ENV_GET_CPU(env);
+    CPUState *cpu = env_cpu(env);
 
     cpu_halted_set(cpu, val);
 }

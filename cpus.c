@@ -112,7 +112,6 @@ bool no_cpu_mutex_locked(void)
     return bitmap_empty(cpu_lock_bitmap, CPU_LOCK_BITMAP_SIZE);
 }
 
-static QemuMutex qemu_global_mutex;
 static __thread bool iothread_locked;
 /*
  * In TCG rr mode, we make the BQL a recursive mutex, so that we can use it for

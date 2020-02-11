@@ -1,5 +1,5 @@
 #include "qemu/osdep.h"
-#include "qom/cpu.h"
+#include "hw/core/cpu.h"
 
 void cpu_mutex_lock_impl(CPUState *cpu, const char *file, int line)
 {
