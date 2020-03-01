@@ -414,7 +414,7 @@ void aio_notify(AioContext *ctx)
      * with atomic_or in aio_ctx_prepare or atomic_add in aio_poll.
      */
     smp_mb();
-    if (ctx->notify_me) {
+    if (atomic_read(&ctx->notify_me)) {
         event_notifier_set(&ctx->notifier);
         atomic_mb_set(&ctx->notified, true);
     }
