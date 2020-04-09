@@ -1,0 +1,7 @@
+race:bswap.h
+race:bitops.c
+race:bitmap.c
+race:store_helper
+race:load_helper
+race:tb_set_jmp_target
+mutex:aio_context_acquire
