@@ -27,6 +27,14 @@ requires()
 
 configure_qemu()
 {
+    if test -z "$TSAN"; then
+        requires clang tsan
+        echo "Including TSAN Support"
+        EXTRA_CONFIGURE_OPTS="${EXTRA_CONFIGURE_OPTS} --enable-tsan \
+                             --cc=clang-10 --cxx=clang++-10 \
+                             --disable-werror --extra-cflags=-O0"
+        export TSAN_OPTIONS="suppressions=/tmp/qemu-test/src/tests/tsan/suppressions.tsan detect_deadlocks=false history_size=7 halt_on_error=0 exitcode=66 verbose=5 log_path=tsan_warnings.txt."
+    fi
     config_opts="--enable-werror \
                  ${TARGET_LIST:+--target-list=${TARGET_LIST}} \
                  --prefix=$INSTALL_DIR \
