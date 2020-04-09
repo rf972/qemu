@@ -26,7 +26,7 @@ requires()
 }
 
 configure_qemu()
-{
+{    
     config_opts="--enable-werror \
                  ${TARGET_LIST:+--target-list=${TARGET_LIST}} \
                  --prefix=$INSTALL_DIR \
