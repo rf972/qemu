@@ -1,0 +1,4 @@
+# the vector intrinsics upset tsan
+#src:bufferiszero.c
+src:bitops.c
+src:bitmap.c
