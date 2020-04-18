@@ -58,6 +58,7 @@
 #include "exec/log.h"
 #include "sysemu/cpus.h"
 #include "sysemu/tcg.h"
+#include "qemu/tsan.h"
 
 /* #define DEBUG_TB_INVALIDATE */
 /* #define DEBUG_TB_FLUSH */
@@ -1710,6 +1711,7 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
         cpu_loop_exit(cpu);
     }
 
+    TSAN_ANNOTATE_IGNORE_WRITES_BEGIN();
     gen_code_buf = tcg_ctx->code_gen_ptr;
     tb->tc.ptr = gen_code_buf;
     tb->pc = pc;
@@ -1719,6 +1721,7 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
     tb->orig_tb = NULL;
     tb->trace_vcpu_dstate = *cpu->trace_dstate;
     tcg_ctx->tb_cflags = cflags;
+    TSAN_ANNOTATE_IGNORE_WRITES_END();
  tb_overflow:
 
 #ifdef CONFIG_PROFILER
@@ -1836,6 +1839,7 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
         ROUND_UP((uintptr_t)gen_code_buf + gen_code_size + search_size,
                  CODE_GEN_ALIGN));
 
+    TSAN_ANNOTATE_IGNORE_WRITES_BEGIN();
     /* init jump list */
     qemu_spin_init(&tb->jmp_lock);
     tb->jmp_list_head = (uintptr_t)NULL;
@@ -1870,9 +1874,11 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
         orig_aligned -= ROUND_UP(sizeof(*tb), qemu_icache_linesize);
         atomic_set(&tcg_ctx->code_gen_ptr, (void *)orig_aligned);
         tb_destroy(tb);
+        TSAN_ANNOTATE_IGNORE_WRITES_END();
         return existing_tb;
     }
     tcg_tb_insert(tb);
+    TSAN_ANNOTATE_IGNORE_WRITES_END();
     return tb;
 }
 
