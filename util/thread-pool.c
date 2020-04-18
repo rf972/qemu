@@ -21,6 +21,7 @@
 #include "trace.h"
 #include "block/thread-pool.h"
 #include "qemu/main-loop.h"
+#include "qemu/tsan.h"
 
 static void do_spawn_thread(ThreadPool *pool);
 
@@ -97,7 +98,11 @@ static void *worker_thread(void *opaque)
         }
 
         req = QTAILQ_FIRST(&pool->request_list);
+        TSAN_ANNOTATE_IGNORE_WRITES_BEGIN();
         QTAILQ_REMOVE(&pool->request_list, req, reqs);
+        TSAN_ANNOTATE_IGNORE_WRITES_END();
+
+        TSAN_ANNOTATE_IGNORE_WRITES_BEGIN();
         req->state = THREAD_ACTIVE;
         qemu_mutex_unlock(&pool->lock);
 
@@ -107,7 +112,7 @@ static void *worker_thread(void *opaque)
         /* Write ret before state.  */
         smp_wmb();
         req->state = THREAD_DONE;
-
+        TSAN_ANNOTATE_IGNORE_WRITES_END();
         qemu_mutex_lock(&pool->lock);
 
         qemu_bh_schedule(pool->completion_bh);
