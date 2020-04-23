@@ -397,6 +397,21 @@ list is in the ``make docker`` help text. The frequently used ones are:
 * ``DEBUG=1``: enables debug. See the previous "Debugging a Docker test
   failure" section.
 
+Thread Sanitizer
+----------------
+TSan is currently supported in the ubuntu2004 docker.
+
+Just add the TSAN=1 argument to use TSan:
+
+make docker-test-quick@ubuntu2004 TSAN=1
+
+A few important files to note are:
+tests/tsan/suppressions.tsan - Has TSan warnings we wish to suppress, 
+                               but which will eventually be fixed.
+tests/tsan/blacklist.tsan - Has TSan warnings we wish to disable permanently.
+include/qemu/tsan.h - Defines various annotations which can
+                      also be used to suppress warnings.
+
 VM testing
 ==========
 
