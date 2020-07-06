@@ -27,6 +27,8 @@ void qemu_mutex_destroy(QemuMutex *mutex);
 int qemu_mutex_trylock_impl(QemuMutex *mutex, const char *file, const int line);
 void qemu_mutex_lock_impl(QemuMutex *mutex, const char *file, const int line);
 void qemu_mutex_unlock_impl(QemuMutex *mutex, const char *file, const int line);
+void qemu_mutex_lock_timing_impl(QemuMutex *mutex, const char *file, const int line);
+void qemu_mutex_unlock_timing_impl(QemuMutex *mutex, const char *file, const int line);
 
 typedef void (*QemuMutexLockFunc)(QemuMutex *m, const char *f, int l);
 typedef int (*QemuMutexTrylockFunc)(QemuMutex *m, const char *f, int l);
@@ -39,6 +41,7 @@ typedef bool (*QemuCondTimedWaitFunc)(QemuCond *c, QemuMutex *m, int ms,
 
 extern QemuMutexLockFunc qemu_bql_mutex_lock_func;
 extern QemuMutexLockFunc qemu_mutex_lock_func;
+extern QemuMutexLockFunc qemu_mutex_lock_timing_func;
 extern QemuMutexTrylockFunc qemu_mutex_trylock_func;
 extern QemuRecMutexLockFunc qemu_rec_mutex_lock_func;
 extern QemuRecMutexTrylockFunc qemu_rec_mutex_trylock_func;

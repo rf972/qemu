@@ -541,9 +541,11 @@ static inline uint32_t cpu_interrupt_request(CPUState *cpu)
 {
     return atomic_read(&cpu->interrupt_request);
 }
-
-static inline void cpu_interrupt_request_or(CPUState *cpu, uint32_t mask)
+static inline uint32_t cpu_interrupt_request_or(CPUState *cpu, uint32_t mask)
 {
+#if 1
+    return atomic_fetch_or(&cpu->interrupt_request, mask);
+#else
     if (cpu_mutex_locked(cpu)) {
         atomic_set(&cpu->interrupt_request, cpu->interrupt_request | mask);
         return;
@@ -551,6 +553,7 @@ static inline void cpu_interrupt_request_or(CPUState *cpu, uint32_t mask)
     cpu_mutex_lock(cpu);
     atomic_set(&cpu->interrupt_request, cpu->interrupt_request | mask);
     cpu_mutex_unlock(cpu);
+#endif    
 }
 
 static inline void cpu_interrupt_request_set(CPUState *cpu, uint32_t val)

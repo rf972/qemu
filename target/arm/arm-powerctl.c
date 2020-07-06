@@ -147,7 +147,6 @@ int arm_set_cpu_on(uint64_t cpuid, uint64_t entry, uint64_t context_id,
     ARMCPU *target_cpu;
     struct CpuOnInfo *info;
 
-    assert(qemu_mutex_iothread_locked());
 
     DPRINTF("cpu %" PRId64 " (EL %d, %s) @ 0x%" PRIx64 " with R0 = 0x%" PRIx64
             "\n", cpuid, target_el, target_aa64 ? "aarch64" : "aarch32", entry,
@@ -170,6 +169,10 @@ int arm_set_cpu_on(uint64_t cpuid, uint64_t entry, uint64_t context_id,
         /* The cpu was not found */
         return QEMU_ARM_POWERCTL_INVALID_PARAM;
     }
+    bool cpu_lock = !cpu_mutex_locked(target_cpu_state);
+    if (cpu_lock){
+        cpu_mutex_lock(target_cpu_state);
+    }
 
     target_cpu = ARM_CPU(target_cpu_state);
     if (target_cpu->power_state == PSCI_ON) {
@@ -189,6 +192,9 @@ int arm_set_cpu_on(uint64_t cpuid, uint64_t entry, uint64_t context_id,
         /*
          * The CPU does not support requested level
          */
+        if (cpu_lock) {
+            cpu_mutex_unlock(target_cpu_state);
+        }
         return QEMU_ARM_POWERCTL_INVALID_PARAM;
     }
 
@@ -201,6 +207,9 @@ int arm_set_cpu_on(uint64_t cpuid, uint64_t entry, uint64_t context_id,
                       "[ARM]%s: Starting AArch64 CPU %" PRId64
                       " in AArch32 mode is not supported yet\n",
                       __func__, cpuid);
+        if (cpu_lock) {
+            cpu_mutex_unlock(target_cpu_state);
+        }
         return QEMU_ARM_POWERCTL_INVALID_PARAM;
     }
 
@@ -214,7 +223,14 @@ int arm_set_cpu_on(uint64_t cpuid, uint64_t entry, uint64_t context_id,
         qemu_log_mask(LOG_GUEST_ERROR,
                       "[ARM]%s: CPU %" PRId64 " is already powering on\n",
                       __func__, cpuid);
+        if (cpu_lock) {
+            cpu_mutex_unlock(target_cpu_state);
+        }
         return QEMU_ARM_POWERCTL_ON_PENDING;
+    }
+
+    if (cpu_lock) {
+        cpu_mutex_unlock(target_cpu_state);
     }
 
     /* To avoid racing with a CPU we are just kicking off we do the

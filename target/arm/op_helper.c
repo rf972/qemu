@@ -695,6 +695,8 @@ void HELPER(set_cp_reg)(CPUARMState *env, void *rip, uint32_t value)
 {
     const ARMCPRegInfo *ri = rip;
 
+    g_assert((ri->type & ARM_CP_PER_CPU) == 0);
+    g_assert((ri->type & ARM_CP_GIC) == 0);
     if (ri->type & ARM_CP_IO) {
         qemu_mutex_lock_iothread();
         ri->writefn(env, ri, value);
@@ -708,6 +710,8 @@ uint32_t HELPER(get_cp_reg)(CPUARMState *env, void *rip)
 {
     const ARMCPRegInfo *ri = rip;
     uint32_t res;
+    g_assert((ri->type & ARM_CP_PER_CPU) == 0);
+    g_assert((ri->type & ARM_CP_GIC) == 0);
 
     if (ri->type & ARM_CP_IO) {
         qemu_mutex_lock_iothread();
@@ -719,7 +723,8 @@ uint32_t HELPER(get_cp_reg)(CPUARMState *env, void *rip)
 
     return res;
 }
-
+void arm_cpu_gic_lock(CPUState *cpu);
+void arm_cpu_gic_unlock(CPUState *cpu);
 void HELPER(set_cp_reg64)(CPUARMState *env, void *rip, uint64_t value)
 {
     const ARMCPRegInfo *ri = rip;
@@ -728,6 +733,51 @@ void HELPER(set_cp_reg64)(CPUARMState *env, void *rip, uint64_t value)
         qemu_mutex_lock_iothread();
         ri->writefn(env, ri, value);
         qemu_mutex_unlock_iothread();
+    } else if (ri->type & ARM_CP_GIC) {
+        CPUState *cs = env_cpu(env);
+        //qemu_mutex_lock_iothread();
+        arm_cpu_gic_lock(cs);
+        ri->writefn(env, ri, value);
+        arm_cpu_gic_unlock(cs);
+        //qemu_mutex_unlock_iothread();
+    } else if (0 && ri->type & ARM_CP_PER_CPU) {
+        CPUState *cs = env_cpu(env);
+        struct timeval start, locked, end;
+        double elapsed;
+        gettimeofday(&start, NULL);
+        cpu_mutex_lock(cs);
+        gettimeofday(&locked, NULL);
+        elapsed = (locked.tv_sec - start.tv_sec) * 1000.0; // sec to ms
+        elapsed += (locked.tv_usec - start.tv_usec) / 1000.0; // us to ms
+        qemu_log("%d@%zu.%06zu:set_cp_reg64 " "lock cpu %s wait: %f ms" "\n",
+                 qemu_get_thread_id(),
+                 (size_t)locked.tv_sec, (size_t)locked.tv_usec, ri->name, elapsed);
+        ri->writefn(env, ri, value);
+        cpu_mutex_unlock(cs);
+        gettimeofday(&end, NULL);
+        // compute and print the elapsed time in millisec
+        elapsed = (end.tv_sec - start.tv_sec) * 1000.0; // sec to ms
+        elapsed += (end.tv_usec - start.tv_usec) / 1000.0; // us to ms
+        qemu_log("%d@%zu.%06zu:set_cp_reg64 " "unlock cpu %s held: %f ms" "\n",
+                 qemu_get_thread_id(),
+                 (size_t)end.tv_sec, (size_t)end.tv_usec, ri->name, elapsed);
+    } else if (0 && ri->type & ARM_CP_PER_CPU) {
+        qemu_mutex_lock_iothread();
+        ri->writefn(env, ri, value);
+        qemu_mutex_unlock_iothread();
+    } else if (0 && ri->type & ARM_CP_PER_CPU) {
+        CPUState *cs = env_cpu(env);
+        qemu_mutex_lock_iothread();
+        g_assert(!cpu_mutex_locked(cs));
+        cpu_mutex_lock(cs);
+        ri->writefn(env, ri, value);
+        cpu_mutex_unlock(cs);
+        qemu_mutex_unlock_iothread();
+    } else if (1 && ri->type & ARM_CP_PER_CPU) {
+        CPUState *cs = env_cpu(env);
+        cpu_mutex_lock(cs);
+        ri->writefn(env, ri, value);
+        cpu_mutex_unlock(cs);
     } else {
         ri->writefn(env, ri, value);
     }
@@ -739,9 +789,37 @@ uint64_t HELPER(get_cp_reg64)(CPUARMState *env, void *rip)
     uint64_t res;
 
     if (ri->type & ARM_CP_IO) {
+        //struct timeval _now;
+        //gettimeofday(&_now, NULL);
+        qemu_mutex_lock_iothread();
+        //qemu_log("%d@%zu.%06zu:get_cp_reg64 " "lock %s" "\n",
+        //         qemu_get_thread_id(),
+        //         (size_t)_now.tv_sec, (size_t)_now.tv_usec, ri->name);
+        res = ri->readfn(env, ri);
+        qemu_mutex_unlock_iothread();
+        //gettimeofday(&_now, NULL);
+        //qemu_log("%d@%zu.%06zu:get_cp_reg64 " "unlock %s" "\n",
+        //         qemu_get_thread_id(),
+        //         (size_t)_now.tv_sec, (size_t)_now.tv_usec, ri->name);
+    } else if (ri->type & ARM_CP_GIC) {
+        CPUState *cs = env_cpu(env);
+        //qemu_mutex_lock_iothread();
+        arm_cpu_gic_lock(cs);
+        res = ri->readfn(env, ri);
+        arm_cpu_gic_unlock(cs);
+        //qemu_mutex_unlock_iothread();
+    } else if (0 && ri->type & ARM_CP_PER_CPU) {
         qemu_mutex_lock_iothread();
         res = ri->readfn(env, ri);
         qemu_mutex_unlock_iothread();
+    } else if (1 && ri->type & ARM_CP_PER_CPU) {
+        CPUState *cs = env_cpu(env);
+        g_assert(!cpu_mutex_locked(cs));
+        cpu_mutex_lock(cs);
+        res = ri->readfn(env, ri);
+        cpu_mutex_unlock(cs);
+        //qemu_mutex_lock_iothread();
+        //qemu_mutex_unlock_iothread();
     } else {
         res = ri->readfn(env, ri);
     }

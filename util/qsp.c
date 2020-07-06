@@ -64,6 +64,7 @@
 #include "qemu/qht.h"
 #include "qemu/rcu.h"
 #include "qemu/xxhash.h"
+#include "trace.h"
 
 enum QSPType {
     QSP_MUTEX,
@@ -124,8 +125,9 @@ static const char * const qsp_typenames[] = {
     [QSP_CONDVAR]   = "condvar",
 };
 
-QemuMutexLockFunc qemu_bql_mutex_lock_func = qemu_mutex_lock_impl;
+QemuMutexLockFunc qemu_bql_mutex_lock_func = qemu_mutex_lock_timing_impl;
 QemuMutexLockFunc qemu_mutex_lock_func = qemu_mutex_lock_impl;
+QemuMutexLockFunc qemu_mutex_lock_timing_func = qemu_mutex_lock_timing_impl;
 QemuMutexTrylockFunc qemu_mutex_trylock_func = qemu_mutex_trylock_impl;
 QemuRecMutexLockFunc qemu_rec_mutex_lock_func = qemu_rec_mutex_lock_impl;
 QemuRecMutexTrylockFunc qemu_rec_mutex_trylock_func =
@@ -371,6 +373,22 @@ static inline void qsp_entry_record(QSPEntry *e, int64_t delta)
         qsp_entry_record(e, t1 - t0);                                   \
     }
 
+
+#define QSP_GEN_VOID_TRACE(type_, qsp_t_, func_, impl_)                 \
+    static void func_(type_ *obj, const char *file, int line)           \
+    {                                                                   \
+        QSPEntry *e;                                                    \
+        int64_t t0, t1;                                                 \
+                                                                        \
+        t0 = get_clock();                                               \
+        impl_(obj, file, line);                                         \
+        t1 = get_clock();                                               \
+        trace_qsp_mutex_lock(obj, file, line, t1 - t0);               \
+                                                                        \
+        e = qsp_entry_get(obj, file, line, qsp_t_);                     \
+        qsp_entry_record(e, t1 - t0);                                   \
+    }
+
 #define QSP_GEN_RET1(type_, qsp_t_, func_, impl_)                       \
     static int func_(type_ *obj, const char *file, int line)            \
     {                                                                   \
@@ -386,9 +404,9 @@ static inline void qsp_entry_record(QSPEntry *e, int64_t delta)
         do_qsp_entry_record(e, t1 - t0, !err);                          \
         return err;                                                     \
     }
-
-QSP_GEN_VOID(QemuMutex, QSP_BQL_MUTEX, qsp_bql_mutex_lock, qemu_mutex_lock_impl)
-QSP_GEN_VOID(QemuMutex, QSP_MUTEX, qsp_mutex_lock, qemu_mutex_lock_impl)
+QSP_GEN_VOID_TRACE(QemuMutex, QSP_BQL_MUTEX, qsp_bql_mutex_lock, qemu_mutex_lock_timing_impl)
+QSP_GEN_VOID_TRACE(QemuMutex, QSP_MUTEX, qsp_mutex_lock_timing, qemu_mutex_lock_timing_impl)
+QSP_GEN_VOID_TRACE(QemuMutex, QSP_MUTEX, qsp_mutex_lock, qemu_mutex_lock_impl)
 QSP_GEN_RET1(QemuMutex, QSP_MUTEX, qsp_mutex_trylock, qemu_mutex_trylock_impl)
 
 QSP_GEN_VOID(QemuRecMutex, QSP_REC_MUTEX, qsp_rec_mutex_lock,
@@ -438,6 +456,7 @@ bool qsp_is_enabled(void)
 void qsp_enable(void)
 {
     atomic_set(&qemu_mutex_lock_func, qsp_mutex_lock);
+    atomic_set(&qemu_mutex_lock_timing_func, qsp_mutex_lock_timing);
     atomic_set(&qemu_mutex_trylock_func, qsp_mutex_trylock);
     atomic_set(&qemu_bql_mutex_lock_func, qsp_bql_mutex_lock);
     atomic_set(&qemu_rec_mutex_lock_func, qsp_rec_mutex_lock);

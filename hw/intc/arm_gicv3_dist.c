@@ -13,6 +13,7 @@
 #include "qemu/log.h"
 #include "trace.h"
 #include "gicv3_internal.h"
+#include "hw/core/cpu.h"
 
 /* The GICD_NSACR registers contain a two bit field for each interrupt which
  * allows the guest to give NonSecure code access to registers controlling
@@ -800,7 +801,10 @@ MemTxResult gicv3_dist_read(void *opaque, hwaddr offset, uint64_t *data,
 {
     GICv3State *s = (GICv3State *)opaque;
     MemTxResult r;
+    g_assert(!qemu_mutex_iothread_locked());
 
+    //g_assert(qemu_mutex_iothread_locked());
+    arm_gic_lock(s);
     switch (size) {
     case 1:
         r = gicd_readb(s, offset, data, attrs);
@@ -834,6 +838,7 @@ MemTxResult gicv3_dist_read(void *opaque, hwaddr offset, uint64_t *data,
     } else {
         trace_gicv3_dist_read(offset, *data, size, attrs.secure);
     }
+    arm_gic_unlock(s);
     return r;
 }
 
@@ -842,7 +847,9 @@ MemTxResult gicv3_dist_write(void *opaque, hwaddr offset, uint64_t data,
 {
     GICv3State *s = (GICv3State *)opaque;
     MemTxResult r;
-
+    
+    g_assert(!qemu_mutex_iothread_locked());
+    arm_gic_lock(s);
     switch (size) {
     case 1:
         r = gicd_writeb(s, offset, data, attrs);
@@ -875,11 +882,14 @@ MemTxResult gicv3_dist_write(void *opaque, hwaddr offset, uint64_t data,
     } else {
         trace_gicv3_dist_write(offset, data, size, attrs.secure);
     }
+    arm_gic_unlock(s);
     return r;
 }
 
 void gicv3_dist_set_irq(GICv3State *s, int irq, int level)
-{
+{    
+    g_assert(arm_gic_locked(s));
+
     /* Update distributor state for a change in an external SPI input line */
     if (level == gicv3_gicd_level_test(s, irq)) {
         return;

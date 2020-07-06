@@ -69,7 +69,6 @@ void qemu_mutex_destroy(QemuMutex *mutex)
     if (err)
         error_exit(err, __func__);
 }
-
 void qemu_mutex_lock_impl(QemuMutex *mutex, const char *file, const int line)
 {
     int err;
@@ -80,6 +79,18 @@ void qemu_mutex_lock_impl(QemuMutex *mutex, const char *file, const int line)
     if (err)
         error_exit(err, __func__);
     qemu_mutex_post_lock(mutex, file, line);
+}
+void qemu_mutex_lock_timing_impl(QemuMutex *mutex, const char *file, const int line)
+{
+    int err;
+    uint64_t start_time = get_clock();
+
+    assert(mutex->initialized);
+    qemu_mutex_pre_lock_timing(mutex, file, line);
+    err = pthread_mutex_lock(&mutex->lock);
+    if (err)
+        error_exit(err, __func__);
+    qemu_mutex_post_lock_timing(mutex, file, line, start_time);
 }
 
 int qemu_mutex_trylock_impl(QemuMutex *mutex, const char *file, const int line)
@@ -104,6 +115,17 @@ void qemu_mutex_unlock_impl(QemuMutex *mutex, const char *file, const int line)
 
     assert(mutex->initialized);
     qemu_mutex_pre_unlock(mutex, file, line);
+    err = pthread_mutex_unlock(&mutex->lock);
+    if (err)
+        error_exit(err, __func__);
+}
+
+void qemu_mutex_unlock_timing_impl(QemuMutex *mutex, const char *file, const int line)
+{
+    int err;
+
+    assert(mutex->initialized);
+    qemu_mutex_pre_unlock_timing(mutex, file, line);
     err = pthread_mutex_unlock(&mutex->lock);
     if (err)
         error_exit(err, __func__);

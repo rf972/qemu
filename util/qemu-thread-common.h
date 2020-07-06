@@ -15,6 +15,7 @@
 
 #include "qemu/thread.h"
 #include "trace.h"
+#include "qemu/timer.h"
 
 static inline void qemu_mutex_post_init(QemuMutex *mutex)
 {
@@ -51,4 +52,32 @@ static inline void qemu_mutex_pre_unlock(QemuMutex *mutex,
     trace_qemu_mutex_unlock(mutex, file, line);
 }
 
+static inline void qemu_mutex_pre_lock_timing(QemuMutex *mutex,
+                                       const char *file, int line)
+{
+    trace_qemu_mutex_lock_timing(qemu_get_thread_id(), mutex, file, line, get_clock());
+}
+
+static inline void qemu_mutex_post_lock_timing(QemuMutex *mutex,
+                                        const char *file, int line, uint64_t start_time)
+{
+#ifdef CONFIG_DEBUG_MUTEX
+    mutex->file = file;
+    mutex->line = line;
+#endif
+    uint64_t current_time = get_clock();
+    
+    trace_qemu_mutex_locked_timing(qemu_get_thread_id(), mutex, file, line, current_time - start_time);
+    mutex->obtain_time = current_time;
+}
+
+static inline void qemu_mutex_pre_unlock_timing(QemuMutex *mutex,
+                                         const char *file, int line)
+{
+#ifdef CONFIG_DEBUG_MUTEX
+    mutex->file = NULL;
+    mutex->line = 0;
+#endif
+    trace_qemu_mutex_unlock_timing(qemu_get_thread_id(), mutex, file, line, get_clock() - mutex->obtain_time);
+}
 #endif

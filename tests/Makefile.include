@@ -156,6 +156,7 @@ check-unit-$(CONFIG_SOFTMMU) += tests/test-bufferiszero$(EXESUF)
 check-unit-y += tests/test-uuid$(EXESUF)
 check-unit-y += tests/ptimer-test$(EXESUF)
 check-unit-y += tests/test-qapi-util$(EXESUF)
+check-unit-y += tests/test-mutex(EXESUF)
 
 check-block-$(call land,$(CONFIG_POSIX),$(CONFIG_SOFTMMU)) += tests/check-block.sh
 
@@ -460,7 +461,7 @@ tests/test-keyval$(EXESUF): tests/test-keyval.o $(test-util-obj-y) $(test-qapi-o
 tests/test-write-threshold$(EXESUF): tests/test-write-threshold.o $(test-block-obj-y)
 tests/test-uuid$(EXESUF): tests/test-uuid.o $(test-util-obj-y)
 tests/test-qapi-util$(EXESUF): tests/test-qapi-util.o $(test-util-obj-y)
-
+tests/test-mutex$(EXESUF): tests/test-mutex.o $(test-util-obj-y) $(test-io-obj-y) tests/socket-helpers.o tests/test-mutex-profile.o tests/test-mutex-log.o tests/fair-mutex.o tests/mcs-lock.o
 tests/test-logging$(EXESUF): tests/test-logging.o $(test-util-obj-y)
 
 tests/test-replication$(EXESUF): tests/test-replication.o $(test-util-obj-y) \

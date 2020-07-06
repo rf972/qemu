@@ -16,6 +16,7 @@ struct QemuMutex {
     const char *file;
     int line;
 #endif
+    uint64_t obtain_time;
     bool initialized;
 };
 
