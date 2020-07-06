@@ -517,9 +517,13 @@ static inline bool cpu_handle_exception(CPUState *cpu, int *ret)
 #else
         if (replay_exception()) {
             CPUClass *cc = CPU_GET_CLASS(cpu);
-            qemu_mutex_lock_iothread();
+            if (cc->bql_interrupt) {
+                qemu_mutex_lock_iothread();
+            }
             cc->do_interrupt(cpu);
-            qemu_mutex_unlock_iothread();
+            if (cc->bql_interrupt) {
+                qemu_mutex_unlock_iothread();
+            }
             cpu->exception_index = -1;
         } else if (!replay_has_interrupt()) {
             /* give a chance to iothread in replay mode */
@@ -547,7 +551,7 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
     if (unlikely(cpu_interrupt_request(cpu))) {
         int interrupt_request;
 
-        qemu_mutex_lock_iothread();
+        cpu_mutex_lock(cpu);
         interrupt_request = cpu_interrupt_request(cpu);
         if (unlikely(cpu->singlestep_enabled & SSTEP_NOIRQ)) {
             /* Mask out external interrupts for this step. */
@@ -556,7 +560,7 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
         if (interrupt_request & CPU_INTERRUPT_DEBUG) {
             cpu_reset_interrupt(cpu, CPU_INTERRUPT_DEBUG);
             cpu->exception_index = EXCP_DEBUG;
-            qemu_mutex_unlock_iothread();
+            cpu_mutex_unlock(cpu);
             return true;
         }
         if (replay_mode == REPLAY_MODE_PLAY && !replay_has_interrupt()) {
@@ -566,7 +570,7 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
             cpu_reset_interrupt(cpu, CPU_INTERRUPT_HALT);
             cpu_halted_set(cpu, 1);
             cpu->exception_index = EXCP_HLT;
-            qemu_mutex_unlock_iothread();
+            cpu_mutex_unlock(cpu);
             return true;
         }
 #if defined(TARGET_I386)
@@ -577,14 +581,14 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
             cpu_svm_check_intercept_param(env, SVM_EXIT_INIT, 0, 0);
             do_cpu_init(x86_cpu);
             cpu->exception_index = EXCP_HALTED;
-            qemu_mutex_unlock_iothread();
+            cpu_mutex_unlock(cpu);
             return true;
         }
 #else
         else if (interrupt_request & CPU_INTERRUPT_RESET) {
             replay_interrupt();
             cpu_reset(cpu);
-            qemu_mutex_unlock_iothread();
+            cpu_mutex_unlock(cpu);
             return true;
         }
 #endif
@@ -593,10 +597,23 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
            True when it is, and we should restart on a new TB,
            and via longjmp via cpu_loop_exit.  */
         else {
+            cpu_mutex_unlock(cpu);
+            if (cc->bql_interrupt) {
+                qemu_mutex_lock_iothread();
+            }
             if (cc->cpu_exec_interrupt(cpu, interrupt_request)) {
+                if (cc->bql_interrupt) {
+                    qemu_mutex_unlock_iothread();
+                }
+                cpu_mutex_lock(cpu);
                 replay_interrupt();
                 cpu->exception_index = -1;
                 *last_tb = NULL;
+            } else {
+                if (cc->bql_interrupt) {
+                    qemu_mutex_unlock_iothread();
+                }
+                cpu_mutex_lock(cpu);
             }
             /* The target hook may have updated the 'cpu->interrupt_request';
              * reload the 'interrupt_request' value */
@@ -610,7 +627,7 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
         }
 
         /* If we exit via cpu_loop_exit/longjmp it is reset in cpu_exec */
-        qemu_mutex_unlock_iothread();
+        cpu_mutex_unlock(cpu);
     }
 
     /* Finally, check if we need to exit to the main loop.  */
@@ -674,7 +691,6 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
     }
 #endif
 }
-
 /* main execution loop */
 
 int cpu_exec(CPUState *cpu)
