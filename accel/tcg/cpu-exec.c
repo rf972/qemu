@@ -55,7 +55,6 @@ typedef struct SyncClocks {
 #define THRESHOLD_REDUCE 1.5
 #define MAX_DELAY_PRINT_RATE 2000000000LL
 #define MAX_NB_PRINTS 100
-
 static void align_clocks(SyncClocks *sc, CPUState *cpu)
 {
     int64_t cpu_icount;
@@ -137,6 +136,60 @@ static void init_delay_params(SyncClocks *sc, const CPUState *cpu)
 }
 #endif /* CONFIG USER ONLY */
 
+
+static bool cpu_int_bench_start = false;
+static bool cpu_int_bench_enable[512];
+static uint64_t cpu_int_bench_start_ns;
+static uint64_t cpu_int_bench_count[512];
+static uint32_t cpu_int_bench_threads;
+static uint32_t cpu_int_bench_outstanding;
+
+static inline void cpu_int_bench_inc(CPUState *cpu);
+static void cpu_int_bench(CPUState *cpu);
+
+static inline void cpu_int_bench_inc(CPUState *cpu)
+{
+    atomic_inc(&cpu_int_bench_count[cpu->cpu_index]);
+}
+
+static void cpu_int_bench(CPUState *cpu)
+{
+    if (cpu_int_bench_start) {
+        qemu_mutex_lock_iothread();
+        if (cpu_int_bench_start) {
+            CPUState *tmp_cpu;
+            cpu_int_bench_start_ns = get_clock();
+            cpu_int_bench_threads = 0;
+            CPU_FOREACH (tmp_cpu) {
+                cpu_int_bench_count[tmp_cpu->cpu_index] = 0;
+                cpu_int_bench_enable[tmp_cpu->cpu_index] = true;
+                cpu_int_bench_threads++;
+            }
+            cpu_int_bench_outstanding = cpu_int_bench_threads;
+            cpu_int_bench_start = false;
+        }
+        qemu_mutex_unlock_iothread();
+    }
+    if (cpu_int_bench_enable[cpu->cpu_index]) {
+        if (get_clock() - cpu_int_bench_start_ns < 5000000000) {
+            cpu_interrupt_request_or(cpu, CPU_INTERRUPT_TGT_INT_0);
+            qemu_cpu_kick(cpu);
+        } else {
+            cpu_int_bench_enable[cpu->cpu_index] = false;
+            if (atomic_dec_fetch(&cpu_int_bench_outstanding) == 0) {
+                int i;
+                uint64_t total_ints = 0;
+                for (i = 0; i < cpu_int_bench_threads; i++) {
+                    total_ints += cpu_int_bench_count[i];
+                }
+                printf("total threads: %u total_ints: %lu "
+                       "average_ints: %lu\n",
+                       cpu_int_bench_threads, total_ints,
+                       total_ints / cpu_int_bench_threads);
+            }
+        }
+    }
+}
 /* Execute a TB, and fix up the CPU state afterwards if necessary */
 static inline tcg_target_ulong cpu_tb_exec(CPUState *cpu, TranslationBlock *itb)
 {
@@ -555,7 +608,7 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
 
     if (unlikely(cpu_interrupt_request(cpu))) {
         int interrupt_request;
-
+        cpu_int_bench_inc(cpu);
         cpu_mutex_lock(cpu);
         interrupt_request = cpu_interrupt_request(cpu);
         if (unlikely(cpu->singlestep_enabled & SSTEP_NOIRQ)) {
@@ -754,7 +807,7 @@ int cpu_exec(CPUState *cpu)
         while (!cpu_handle_interrupt(cpu, &last_tb)) {
             uint32_t cflags = cpu->cflags_next_tb;
             TranslationBlock *tb;
-
+            cpu_int_bench(cpu);
             /* When requested, use an exact setting for cflags for the next
                execution.  This is used for icount, precise smc, and stop-
                after-access watchpoints.  Since this request should never
