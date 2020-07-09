@@ -9580,8 +9580,8 @@ void arm_cpu_do_interrupt(CPUState *cs)
     ARMCPU *cpu = ARM_CPU(cs);
     CPUARMState *env = &cpu->env;
     unsigned int new_el = env->exception.target_el;
-    g_assert(qemu_mutex_iothread_locked());
-
+    g_assert(!cpu_mutex_locked(cs));
+    g_assert(!qemu_mutex_iothread_locked());
     assert(!arm_feature(env, ARM_FEATURE_M));
 
     arm_log_exception(cs->exception_index);
@@ -9595,7 +9595,9 @@ void arm_cpu_do_interrupt(CPUState *cs)
     }
 
     if (arm_is_psci_call(cpu, cs->exception_index)) {
+        qemu_mutex_lock_iothread();
         arm_handle_psci_call(cpu);
+        qemu_mutex_unlock_iothread();
         qemu_log_mask(CPU_LOG_INT, "...handled as PSCI call\n");
         return;
     }
@@ -9607,12 +9609,20 @@ void arm_cpu_do_interrupt(CPUState *cs)
      */
 #ifdef CONFIG_TCG
     if (cs->exception_index == EXCP_SEMIHOST) {
+        qemu_mutex_lock_iothread();
         handle_semihosting(cs);
+        qemu_mutex_unlock_iothread();
         return;
     }
 #endif
 
+    bool bql = !env->gicv3state && !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
+
     /* Hooks may change global state so BQL should be held */
+
     arm_call_pre_el_change_hook(cpu);
     assert(!excp_is_internal(cs->exception_index));
     if (arm_el_is_aa64(env, new_el)) {
@@ -9625,6 +9635,9 @@ void arm_cpu_do_interrupt(CPUState *cs)
 
     if (!kvm_enabled()) {
         cpu_interrupt_request_or(cs, CPU_INTERRUPT_EXITTB);
+    }
+    if (bql) {
+        qemu_mutex_unlock_iothread();
     }
 }
 #endif /* !CONFIG_USER_ONLY */

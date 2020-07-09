@@ -2363,10 +2363,11 @@ static inline uint64_t cpreg_to_kvm_id(uint32_t cpregid)
 #define ARM_CP_RAISES_EXC        0x8000
 #define ARM_CP_NEWEL             0x10000
 #define ARM_CP_PER_CPU           0x20000
+#define ARM_CP_GIC               0x40000
 /* Used only as a terminator for ARMCPRegInfo lists */
 #define ARM_CP_SENTINEL          0xfffff
 /* Mask of only the flag bits in a type field */
-#define ARM_CP_FLAG_MASK         0x3f0ff
+#define ARM_CP_FLAG_MASK         0x7f0ff
 
 /* Valid values for ARMCPRegInfo state field, indicating which of
  * the AArch32 and AArch64 execution states this register is visible in.
@@ -3886,4 +3887,6 @@ static inline bool isar_feature_any_tts2uxn(const ARMISARegisters *id)
 #define cpu_isar_feature(name, cpu) \
     ({ ARMCPU *cpu_ = (cpu); isar_feature_##name(&cpu_->isar); })
 
+void arm_cpu_gic_lock_impl(CPUState *cpu, const char *file, int line);
+void arm_cpu_gic_unlock_impl(CPUState *cpu, const char *file, int line);
 #endif
