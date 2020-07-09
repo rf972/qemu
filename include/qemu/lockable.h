@@ -17,11 +17,15 @@
 #include "qemu/thread.h"
 
 typedef void QemuLockUnlockFunc(void *);
+typedef void QemuLockUnlockLocFunc(void *, const char *file, int line);
 
 struct QemuLockable {
     void *object;
+    const char * file;
+    int line;
     QemuLockUnlockFunc *lock;
     QemuLockUnlockFunc *unlock;
+    QemuLockUnlockLocFunc *lock_loc;
 };
 
 /* This function gives an error if an invalid, non-NULL pointer type is passed
@@ -63,14 +67,25 @@ qemu_make_lockable(void *x, QemuLockable *lockable)
                  (QemuSpin *, qemu_spin_unlock),     \
                  unknown_lock_type))
 
+#define QEMU_LOCK_LOC_FUNC(x) ((QemuLockUnlockLocFunc *)    \
+    QEMU_GENERIC(x,                                  \
+                 (QemuMutex *, qemu_mutex_lock_impl),     \
+                 (QemuRecMutex *, qemu_rec_mutex_lock_impl), \
+                 (CoMutex *, NULL),    \
+                 (QemuSpin *, NULL),       \
+                 unknown_lock_type))
+
 /* In C, compound literals have the lifetime of an automatic variable.
  * In C++ it would be different, but then C++ wouldn't need QemuLockable
  * either...
  */
-#define QEMU_MAKE_LOCKABLE_(x) (&(QemuLockable) {     \
+#define QEMU_MAKE_LOCKABLE_(x) (&(QemuLockable) {    \
         .object = (x),                               \
+        .file = __FILE__,                            \
+        .line = __LINE__,                            \
         .lock = QEMU_LOCK_FUNC(x),                   \
         .unlock = QEMU_UNLOCK_FUNC(x),               \
+        .lock_loc = QEMU_LOCK_LOC_FUNC(x),           \
     })
 
 /* QEMU_MAKE_LOCKABLE - Make a polymorphic QemuLockable
@@ -100,7 +115,11 @@ qemu_make_lockable(void *x, QemuLockable *lockable)
 
 static inline void qemu_lockable_lock(QemuLockable *x)
 {
-    x->lock(x->object);
+    if (x->lock_loc) {
+        x->lock_loc(x->object, x->file, x->line);
+    } else {
+        x->lock(x->object);
+    }
 }
 
 static inline void qemu_lockable_unlock(QemuLockable *x)

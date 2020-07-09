@@ -53,8 +53,6 @@ static void tcg_handle_interrupt(CPUState *cpu, int mask)
 {
     int old_mask;
 
-    old_mask = cpu_interrupt_request_or(cpu, mask);
-#if 0    
     if (!cpu_mutex_locked(cpu)) {
         cpu_mutex_lock(cpu);
         old_mask = cpu_interrupt_request(cpu);
@@ -64,7 +62,6 @@ static void tcg_handle_interrupt(CPUState *cpu, int mask)
         old_mask = cpu_interrupt_request(cpu);
         cpu_interrupt_request_or(cpu, mask);
     }
-#endif
     /*
      * If called from iothread context, wake the target cpu in
      * case its halted.
