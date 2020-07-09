@@ -763,6 +763,7 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
     }
 #endif
 }
+
 /* main execution loop */
 
 int cpu_exec(CPUState *cpu)
