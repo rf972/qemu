@@ -222,6 +222,7 @@ struct GICv3State {
     bool security_extn;
     bool irq_reset_nonsecure;
     bool gicd_no_migration_shift_bug;
+    QemuMutex mutex;
 
     int dev_fd; /* kvm device fd if backed by kvm vgic support */
     Error *migration_blocker;
@@ -297,5 +298,12 @@ typedef struct ARMGICv3CommonClass {
 
 void gicv3_init_irqs_and_mmio(GICv3State *s, qemu_irq_handler handler,
                               const MemoryRegionOps *ops, Error **errp);
+#define arm_gic_lock(st)\
+    arm_gic_lock_impl(st, __FILE__, __LINE__);
+#define arm_gic_unlock(st)\
+    arm_gic_unlock_impl(st, __FILE__, __LINE__);
 
+void arm_gic_lock_impl(GICv3State *s, const char *file, int line);
+void arm_gic_unlock_impl(GICv3State *s, const char *file, int line);
+bool arm_gic_locked(GICv3State *s);
 #endif
