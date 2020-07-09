@@ -9582,8 +9582,10 @@ void arm_cpu_do_interrupt(CPUState *cs)
     unsigned int new_el = env->exception.target_el;
     g_assert(!cpu_mutex_locked(cs));
     g_assert(!qemu_mutex_iothread_locked());
-    qemu_mutex_lock_iothread();
-
+    bool bql = !env->gicv3state && !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
     assert(!arm_feature(env, ARM_FEATURE_M));
 
     arm_log_exception(cs->exception_index);
@@ -9617,6 +9619,7 @@ void arm_cpu_do_interrupt(CPUState *cs)
 #endif
 
     /* Hooks may change global state so BQL should be held */
+
     arm_call_pre_el_change_hook(cpu);
     assert(!excp_is_internal(cs->exception_index));
     if (arm_el_is_aa64(env, new_el)) {
@@ -9630,7 +9633,9 @@ void arm_cpu_do_interrupt(CPUState *cs)
     if (!kvm_enabled()) {
         cpu_interrupt_request_or(cs, CPU_INTERRUPT_EXITTB);
     }
-    qemu_mutex_unlock_iothread();
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 #endif /* !CONFIG_USER_ONLY */
 
