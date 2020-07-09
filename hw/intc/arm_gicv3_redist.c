@@ -13,6 +13,7 @@
 #include "qemu/log.h"
 #include "trace.h"
 #include "gicv3_internal.h"
+#include "hw/core/cpu.h"
 
 static uint32_t mask_group(GICv3CPUState *cs, MemTxAttrs attrs)
 {
@@ -421,6 +422,9 @@ MemTxResult gicv3_redist_read(void *opaque, hwaddr offset, uint64_t *data,
     MemTxResult r;
     int cpuidx;
 
+    //g_assert(!qemu_mutex_iothread_locked());
+
+    arm_gic_lock(s);
     assert((offset & (size - 1)) == 0);
 
     /* This region covers all the redistributor pages; there are
@@ -467,6 +471,7 @@ MemTxResult gicv3_redist_read(void *opaque, hwaddr offset, uint64_t *data,
         trace_gicv3_redist_read(gicv3_redist_affid(cs), offset, *data,
                                 size, attrs.secure);
     }
+    arm_gic_unlock(s);
     return r;
 }
 
@@ -478,6 +483,9 @@ MemTxResult gicv3_redist_write(void *opaque, hwaddr offset, uint64_t data,
     MemTxResult r;
     int cpuidx;
 
+    //g_assert(!qemu_mutex_iothread_locked());
+
+    arm_gic_lock(s);
     assert((offset & (size - 1)) == 0);
 
     /* This region covers all the redistributor pages; there are
@@ -523,11 +531,14 @@ MemTxResult gicv3_redist_write(void *opaque, hwaddr offset, uint64_t data,
         trace_gicv3_redist_write(gicv3_redist_affid(cs), offset, data,
                                  size, attrs.secure);
     }
+    arm_gic_unlock(s);
     return r;
 }
 
 void gicv3_redist_set_irq(GICv3CPUState *cs, int irq, int level)
-{
+{    
+    g_assert(arm_gic_locked(cs->gic));
+
     /* Update redistributor state for a change in an external PPI input line */
     if (level == extract32(cs->level, irq, 1)) {
         return;
