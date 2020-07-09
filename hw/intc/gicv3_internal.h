@@ -409,5 +409,6 @@ static inline void gicv3_cache_all_target_cpustates(GICv3State *s)
 }
 
 void gicv3_set_gicv3state(CPUState *cpu, GICv3CPUState *s);
-
+void arm_cpu_gic_lock(CPUState *env);
+void arm_cpu_gic_unlock(CPUState *env);
 #endif /* QEMU_ARM_GICV3_INTERNAL_H */

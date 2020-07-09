@@ -1499,6 +1499,7 @@ static bool pmu_counter_enabled(CPUARMState *env, uint8_t counter)
 static void pmu_update_irq(CPUARMState *env)
 {
     ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     qemu_set_irq(cpu->pmu_interrupt, (env->cp15.c9_pmcr & PMCRE) &&
             (env->cp15.c9_pminten & env->cp15.c9_pmovsr));
 }
@@ -1512,6 +1513,8 @@ static void pmu_update_irq(CPUARMState *env)
 static void pmccntr_op_start(CPUARMState *env)
 {
     uint64_t cycles = cycles_get_count(env);
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
 
     if (pmu_counter_enabled(env, 31)) {
         uint64_t eff_cycles = cycles;
@@ -1541,6 +1544,8 @@ static void pmccntr_op_start(CPUARMState *env)
  */
 static void pmccntr_op_finish(CPUARMState *env)
 {
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     if (pmu_counter_enabled(env, 31)) {
 #ifndef CONFIG_USER_ONLY
         /* Calculate when the counter will next overflow */
@@ -1572,6 +1577,8 @@ static void pmevcntr_op_start(CPUARMState *env, uint8_t counter)
 
     uint16_t event = env->cp15.c14_pmevtyper[counter] & PMXEVTYPER_EVTCOUNT;
     uint64_t count = 0;
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     if (event_supported(event)) {
         uint16_t event_idx = supported_event_map[event];
         count = pm_events[event_idx].get_count(env);
@@ -1591,6 +1598,8 @@ static void pmevcntr_op_start(CPUARMState *env, uint8_t counter)
 
 static void pmevcntr_op_finish(CPUARMState *env, uint8_t counter)
 {
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     if (pmu_counter_enabled(env, counter)) {
 #ifndef CONFIG_USER_ONLY
         uint16_t event = env->cp15.c14_pmevtyper[counter] & PMXEVTYPER_EVTCOUNT;
@@ -1615,6 +1624,8 @@ static void pmevcntr_op_finish(CPUARMState *env, uint8_t counter)
 void pmu_op_start(CPUARMState *env)
 {
     unsigned int i;
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     pmccntr_op_start(env);
     for (i = 0; i < pmu_num_counters(env); i++) {
         pmevcntr_op_start(env, i);
@@ -1624,6 +1635,8 @@ void pmu_op_start(CPUARMState *env)
 void pmu_op_finish(CPUARMState *env)
 {
     unsigned int i;
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     pmccntr_op_finish(env);
     for (i = 0; i < pmu_num_counters(env); i++) {
         pmevcntr_op_finish(env, i);
@@ -1632,12 +1645,18 @@ void pmu_op_finish(CPUARMState *env)
 
 void pmu_pre_el_change(ARMCPU *cpu, void *ignored)
 {
+    g_assert(!cpu_mutex_locked(&cpu->parent_obj));
+    cpu_mutex_lock(&cpu->parent_obj);
     pmu_op_start(&cpu->env);
+    cpu_mutex_unlock(&cpu->parent_obj);
 }
 
 void pmu_post_el_change(ARMCPU *cpu, void *ignored)
 {
+    g_assert(!cpu_mutex_locked(&cpu->parent_obj));
+    cpu_mutex_lock(&cpu->parent_obj);
     pmu_op_finish(&cpu->env);
+    cpu_mutex_unlock(&cpu->parent_obj);
 }
 
 void arm_pmu_timer_cb(void *opaque)
@@ -2167,7 +2186,7 @@ static const ARMCPRegInfo v7_cp_reginfo[] = {
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pmcnten),
       .writefn = pmcntenclr_write },
     { .name = "PMOVSR", .cp = 15, .crn = 9, .crm = 12, .opc1 = 0, .opc2 = 3,
-      .access = PL0_RW, .type = ARM_CP_IO,
+      .access = PL0_RW, .type = ARM_CP_PER_CPU,
       .fieldoffset = offsetoflow32(CPUARMState, cp15.c9_pmovsr),
       .accessfn = pmreg_access,
       .writefn = pmovsr_write,
@@ -2175,18 +2194,18 @@ static const ARMCPRegInfo v7_cp_reginfo[] = {
     { .name = "PMOVSCLR_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 12, .opc2 = 3,
       .access = PL0_RW, .accessfn = pmreg_access,
-      .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pmovsr),
       .writefn = pmovsr_write,
       .raw_writefn = raw_write },
     { .name = "PMSWINC", .cp = 15, .crn = 9, .crm = 12, .opc1 = 0, .opc2 = 4,
       .access = PL0_W, .accessfn = pmreg_access_swinc,
-      .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .writefn = pmswinc_write },
     { .name = "PMSWINC_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 12, .opc2 = 4,
       .access = PL0_W, .accessfn = pmreg_access_swinc,
-      .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .writefn = pmswinc_write },
     { .name = "PMSELR", .cp = 15, .crn = 9, .crm = 12, .opc1 = 0, .opc2 = 5,
       .access = PL0_RW, .type = ARM_CP_ALIAS,
@@ -2199,44 +2218,44 @@ static const ARMCPRegInfo v7_cp_reginfo[] = {
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pmselr),
       .writefn = pmselr_write, .raw_writefn = raw_write, },
     { .name = "PMCCNTR", .cp = 15, .crn = 9, .crm = 13, .opc1 = 0, .opc2 = 0,
-      .access = PL0_RW, .resetvalue = 0, .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .access = PL0_RW, .resetvalue = 0, .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .readfn = pmccntr_read, .writefn = pmccntr_write32,
       .accessfn = pmreg_access_ccntr },
     { .name = "PMCCNTR_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 13, .opc2 = 0,
       .access = PL0_RW, .accessfn = pmreg_access_ccntr,
-      .type = ARM_CP_IO,
+      .type = ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c15_ccnt),
       .readfn = pmccntr_read, .writefn = pmccntr_write,
       .raw_readfn = raw_read, .raw_writefn = raw_write, },
     { .name = "PMCCFILTR", .cp = 15, .opc1 = 0, .crn = 14, .crm = 15, .opc2 = 7,
       .writefn = pmccfiltr_write_a32, .readfn = pmccfiltr_read_a32,
       .access = PL0_RW, .accessfn = pmreg_access,
-      .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .resetvalue = 0, },
     { .name = "PMCCFILTR_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 15, .opc2 = 7,
       .writefn = pmccfiltr_write, .raw_writefn = raw_write,
       .access = PL0_RW, .accessfn = pmreg_access,
-      .type = ARM_CP_IO,
+      .type = ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.pmccfiltr_el0),
       .resetvalue = 0, },
     { .name = "PMXEVTYPER", .cp = 15, .crn = 9, .crm = 13, .opc1 = 0, .opc2 = 1,
-      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = pmreg_access,
       .writefn = pmxevtyper_write, .readfn = pmxevtyper_read },
     { .name = "PMXEVTYPER_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 13, .opc2 = 1,
-      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = pmreg_access,
       .writefn = pmxevtyper_write, .readfn = pmxevtyper_read },
     { .name = "PMXEVCNTR", .cp = 15, .crn = 9, .crm = 13, .opc1 = 0, .opc2 = 2,
-      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = pmreg_access_xevcntr,
       .writefn = pmxevcntr_write, .readfn = pmxevcntr_read },
     { .name = "PMXEVCNTR_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 13, .opc2 = 2,
-      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = pmreg_access_xevcntr,
       .writefn = pmxevcntr_write, .readfn = pmxevcntr_read },
     { .name = "PMUSERENR", .cp = 15, .crn = 9, .crm = 14, .opc1 = 0, .opc2 = 0,
@@ -2252,26 +2271,26 @@ static const ARMCPRegInfo v7_cp_reginfo[] = {
       .writefn = pmuserenr_write, .raw_writefn = raw_write },
     { .name = "PMINTENSET", .cp = 15, .crn = 9, .crm = 14, .opc1 = 0, .opc2 = 1,
       .access = PL1_RW, .accessfn = access_tpm,
-      .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .fieldoffset = offsetoflow32(CPUARMState, cp15.c9_pminten),
       .resetvalue = 0,
       .writefn = pmintenset_write, .raw_writefn = raw_write },
     { .name = "PMINTENSET_EL1", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 0, .crn = 9, .crm = 14, .opc2 = 1,
       .access = PL1_RW, .accessfn = access_tpm,
-      .type = ARM_CP_IO,
+      .type = ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pminten),
       .writefn = pmintenset_write, .raw_writefn = raw_write,
       .resetvalue = 0x0 },
     { .name = "PMINTENCLR", .cp = 15, .crn = 9, .crm = 14, .opc1 = 0, .opc2 = 2,
       .access = PL1_RW, .accessfn = access_tpm,
-      .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pminten),
       .writefn = pmintenclr_write, },
     { .name = "PMINTENCLR_EL1", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 0, .crn = 9, .crm = 14, .opc2 = 2,
       .access = PL1_RW, .accessfn = access_tpm,
-      .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pminten),
       .writefn = pmintenclr_write },
     { .name = "CCSIDR", .state = ARM_CP_STATE_BOTH,
@@ -2670,6 +2689,7 @@ static void gt_recalc_timer(ARMCPU *cpu, int timeridx)
 {
     ARMGenericTimer *gt = &cpu->env.cp15.c14_timer[timeridx];
 
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     if (gt->ctl & 1) {
         /* Timer enabled: calculate and set current ISTATUS, irq, and
          * reset timer to when ISTATUS next has to change
@@ -3083,35 +3103,60 @@ void arm_gt_ptimer_cb(void *opaque)
 {
     ARMCPU *cpu = opaque;
 
+    arm_cpu_gic_lock_impl(&cpu->parent_obj, __FILE__, __LINE__);
+    g_assert(!cpu_mutex_locked(&cpu->parent_obj));
+    cpu_mutex_lock(&cpu->parent_obj);
     gt_recalc_timer(cpu, GTIMER_PHYS);
+    cpu_mutex_unlock(&cpu->parent_obj);
+    arm_cpu_gic_unlock_impl(&cpu->parent_obj, __FILE__, __LINE__);
 }
 
 void arm_gt_vtimer_cb(void *opaque)
 {
     ARMCPU *cpu = opaque;
 
+    arm_cpu_gic_lock_impl(&cpu->parent_obj, __FILE__, __LINE__);
+    g_assert(!cpu_mutex_locked(&cpu->parent_obj));
+    cpu_mutex_lock(&cpu->parent_obj);
     gt_recalc_timer(cpu, GTIMER_VIRT);
+    cpu_mutex_unlock(&cpu->parent_obj);
+    arm_cpu_gic_unlock_impl(&cpu->parent_obj, __FILE__, __LINE__);
 }
 
 void arm_gt_htimer_cb(void *opaque)
 {
     ARMCPU *cpu = opaque;
 
+    arm_cpu_gic_lock_impl(&cpu->parent_obj, __FILE__, __LINE__);
+    g_assert(!cpu_mutex_locked(&cpu->parent_obj));
+    cpu_mutex_lock(&cpu->parent_obj);
     gt_recalc_timer(cpu, GTIMER_HYP);
+    cpu_mutex_unlock(&cpu->parent_obj);
+    arm_cpu_gic_unlock_impl(&cpu->parent_obj, __FILE__, __LINE__);
 }
 
 void arm_gt_stimer_cb(void *opaque)
 {
     ARMCPU *cpu = opaque;
 
+    arm_cpu_gic_lock_impl(&cpu->parent_obj, __FILE__, __LINE__);
+    g_assert(!cpu_mutex_locked(&cpu->parent_obj));
+    cpu_mutex_lock(&cpu->parent_obj);
     gt_recalc_timer(cpu, GTIMER_SEC);
+    cpu_mutex_unlock(&cpu->parent_obj);
+    arm_cpu_gic_unlock_impl(&cpu->parent_obj, __FILE__, __LINE__);
 }
 
 void arm_gt_hvtimer_cb(void *opaque)
 {
     ARMCPU *cpu = opaque;
 
+    arm_cpu_gic_lock_impl(&cpu->parent_obj, __FILE__, __LINE__);
+    g_assert(!cpu_mutex_locked(&cpu->parent_obj));
+    cpu_mutex_lock(&cpu->parent_obj);
     gt_recalc_timer(cpu, GTIMER_HYPVIRT);
+    cpu_mutex_unlock(&cpu->parent_obj);
+    arm_cpu_gic_unlock_impl(&cpu->parent_obj, __FILE__, __LINE__);
 }
 
 static void arm_gt_cntfrq_reset(CPUARMState *env, const ARMCPRegInfo *opaque)
@@ -3147,7 +3192,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     /* per-timer control */
     { .name = "CNTP_CTL", .cp = 15, .crn = 14, .crm = 2, .opc1 = 0, .opc2 = 1,
       .secure = ARM_CP_SECSTATE_NS,
-      .type = ARM_CP_IO | ARM_CP_ALIAS, .access = PL0_RW,
+      .type = ARM_CP_PER_CPU | ARM_CP_ALIAS, .access = PL0_RW,
       .accessfn = gt_ptimer_access,
       .fieldoffset = offsetoflow32(CPUARMState,
                                    cp15.c14_timer[GTIMER_PHYS].ctl),
@@ -3157,7 +3202,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     { .name = "CNTP_CTL_S",
       .cp = 15, .crn = 14, .crm = 2, .opc1 = 0, .opc2 = 1,
       .secure = ARM_CP_SECSTATE_S,
-      .type = ARM_CP_IO | ARM_CP_ALIAS, .access = PL0_RW,
+      .type = ARM_CP_PER_CPU | ARM_CP_ALIAS, .access = PL0_RW,
       .accessfn = gt_ptimer_access,
       .fieldoffset = offsetoflow32(CPUARMState,
                                    cp15.c14_timer[GTIMER_SEC].ctl),
@@ -3165,7 +3210,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     },
     { .name = "CNTP_CTL_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 2, .opc2 = 1,
-      .type = ARM_CP_IO, .access = PL0_RW,
+      .type = ARM_CP_PER_CPU, .access = PL0_RW,
       .accessfn = gt_ptimer_access,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_PHYS].ctl),
       .resetvalue = 0,
@@ -3173,7 +3218,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
       .writefn = gt_phys_redir_ctl_write, .raw_writefn = raw_write,
     },
     { .name = "CNTV_CTL", .cp = 15, .crn = 14, .crm = 3, .opc1 = 0, .opc2 = 1,
-      .type = ARM_CP_IO | ARM_CP_ALIAS, .access = PL0_RW,
+      .type = ARM_CP_PER_CPU | ARM_CP_ALIAS, .access = PL0_RW,
       .accessfn = gt_vtimer_access,
       .fieldoffset = offsetoflow32(CPUARMState,
                                    cp15.c14_timer[GTIMER_VIRT].ctl),
@@ -3182,7 +3227,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     },
     { .name = "CNTV_CTL_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 3, .opc2 = 1,
-      .type = ARM_CP_IO, .access = PL0_RW,
+      .type = ARM_CP_PER_CPU, .access = PL0_RW,
       .accessfn = gt_vtimer_access,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_VIRT].ctl),
       .resetvalue = 0,
@@ -3192,60 +3237,60 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     /* TimerValue views: a 32 bit downcounting view of the underlying state */
     { .name = "CNTP_TVAL", .cp = 15, .crn = 14, .crm = 2, .opc1 = 0, .opc2 = 0,
       .secure = ARM_CP_SECSTATE_NS,
-      .type = ARM_CP_NO_RAW | ARM_CP_IO, .access = PL0_RW,
+      .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU, .access = PL0_RW,
       .accessfn = gt_ptimer_access,
       .readfn = gt_phys_redir_tval_read, .writefn = gt_phys_redir_tval_write,
     },
     { .name = "CNTP_TVAL_S",
       .cp = 15, .crn = 14, .crm = 2, .opc1 = 0, .opc2 = 0,
       .secure = ARM_CP_SECSTATE_S,
-      .type = ARM_CP_NO_RAW | ARM_CP_IO, .access = PL0_RW,
+      .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU, .access = PL0_RW,
       .accessfn = gt_ptimer_access,
       .readfn = gt_sec_tval_read, .writefn = gt_sec_tval_write,
     },
     { .name = "CNTP_TVAL_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 2, .opc2 = 0,
-      .type = ARM_CP_NO_RAW | ARM_CP_IO, .access = PL0_RW,
+      .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU, .access = PL0_RW,
       .accessfn = gt_ptimer_access, .resetfn = gt_phys_timer_reset,
       .readfn = gt_phys_redir_tval_read, .writefn = gt_phys_redir_tval_write,
     },
     { .name = "CNTV_TVAL", .cp = 15, .crn = 14, .crm = 3, .opc1 = 0, .opc2 = 0,
-      .type = ARM_CP_NO_RAW | ARM_CP_IO, .access = PL0_RW,
+      .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU, .access = PL0_RW,
       .accessfn = gt_vtimer_access,
       .readfn = gt_virt_redir_tval_read, .writefn = gt_virt_redir_tval_write,
     },
     { .name = "CNTV_TVAL_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 3, .opc2 = 0,
-      .type = ARM_CP_NO_RAW | ARM_CP_IO, .access = PL0_RW,
+      .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU, .access = PL0_RW,
       .accessfn = gt_vtimer_access, .resetfn = gt_virt_timer_reset,
       .readfn = gt_virt_redir_tval_read, .writefn = gt_virt_redir_tval_write,
     },
     /* The counter itself */
     { .name = "CNTPCT", .cp = 15, .crm = 14, .opc1 = 0,
-      .access = PL0_R, .type = ARM_CP_64BIT | ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_R, .type = ARM_CP_64BIT | ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = gt_pct_access,
       .readfn = gt_cnt_read, .resetfn = arm_cp_reset_ignore,
     },
     { .name = "CNTPCT_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 0, .opc2 = 1,
-      .access = PL0_R, .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_R, .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = gt_pct_access, .readfn = gt_cnt_read,
     },
     { .name = "CNTVCT", .cp = 15, .crm = 14, .opc1 = 1,
-      .access = PL0_R, .type = ARM_CP_64BIT | ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_R, .type = ARM_CP_64BIT | ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = gt_vct_access,
       .readfn = gt_virt_cnt_read, .resetfn = arm_cp_reset_ignore,
     },
     { .name = "CNTVCT_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 0, .opc2 = 2,
-      .access = PL0_R, .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_R, .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = gt_vct_access, .readfn = gt_virt_cnt_read,
     },
     /* Comparison value, indicating when the timer goes off */
     { .name = "CNTP_CVAL", .cp = 15, .crm = 14, .opc1 = 2,
       .secure = ARM_CP_SECSTATE_NS,
       .access = PL0_RW,
-      .type = ARM_CP_64BIT | ARM_CP_IO | ARM_CP_ALIAS,
+      .type = ARM_CP_64BIT | ARM_CP_PER_CPU | ARM_CP_ALIAS,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_PHYS].cval),
       .accessfn = gt_ptimer_access,
       .readfn = gt_phys_redir_cval_read, .raw_readfn = raw_read,
@@ -3254,7 +3299,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     { .name = "CNTP_CVAL_S", .cp = 15, .crm = 14, .opc1 = 2,
       .secure = ARM_CP_SECSTATE_S,
       .access = PL0_RW,
-      .type = ARM_CP_64BIT | ARM_CP_IO | ARM_CP_ALIAS,
+      .type = ARM_CP_64BIT | ARM_CP_PER_CPU | ARM_CP_ALIAS,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_SEC].cval),
       .accessfn = gt_ptimer_access,
       .writefn = gt_sec_cval_write, .raw_writefn = raw_write,
@@ -3262,7 +3307,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     { .name = "CNTP_CVAL_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 2, .opc2 = 2,
       .access = PL0_RW,
-      .type = ARM_CP_IO,
+      .type = ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_PHYS].cval),
       .resetvalue = 0, .accessfn = gt_ptimer_access,
       .readfn = gt_phys_redir_cval_read, .raw_readfn = raw_read,
@@ -3270,7 +3315,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     },
     { .name = "CNTV_CVAL", .cp = 15, .crm = 14, .opc1 = 3,
       .access = PL0_RW,
-      .type = ARM_CP_64BIT | ARM_CP_IO | ARM_CP_ALIAS,
+      .type = ARM_CP_64BIT | ARM_CP_PER_CPU | ARM_CP_ALIAS,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_VIRT].cval),
       .accessfn = gt_vtimer_access,
       .readfn = gt_virt_redir_cval_read, .raw_readfn = raw_read,
@@ -3279,7 +3324,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     { .name = "CNTV_CVAL_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 3, .opc2 = 2,
       .access = PL0_RW,
-      .type = ARM_CP_IO,
+      .type = ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_VIRT].cval),
       .resetvalue = 0, .accessfn = gt_vtimer_access,
       .readfn = gt_virt_redir_cval_read, .raw_readfn = raw_read,
@@ -3290,7 +3335,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
      */
     { .name = "CNTPS_TVAL_EL1", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 7, .crn = 14, .crm = 2, .opc2 = 0,
-      .type = ARM_CP_NO_RAW | ARM_CP_IO, .access = PL1_RW,
+      .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU, .access = PL1_RW,
       .accessfn = gt_stimer_access,
       .readfn = gt_sec_tval_read,
       .writefn = gt_sec_tval_write,
@@ -3298,7 +3343,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     },
     { .name = "CNTPS_CTL_EL1", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 7, .crn = 14, .crm = 2, .opc2 = 1,
-      .type = ARM_CP_IO, .access = PL1_RW,
+      .type = ARM_CP_PER_CPU, .access = PL1_RW,
       .accessfn = gt_stimer_access,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_SEC].ctl),
       .resetvalue = 0,
@@ -3306,7 +3351,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     },
     { .name = "CNTPS_CVAL_EL1", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 7, .crn = 14, .crm = 2, .opc2 = 2,
-      .type = ARM_CP_IO, .access = PL1_RW,
+      .type = ARM_CP_PER_CPU, .access = PL1_RW,
       .accessfn = gt_stimer_access,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_SEC].cval),
       .writefn = gt_sec_cval_write, .raw_writefn = raw_write,
@@ -3349,7 +3394,7 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
     },
     { .name = "CNTVCT_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 0, .opc2 = 2,
-      .access = PL0_R, .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_R, .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .readfn = gt_virt_cnt_read,
     },
     REGINFO_SENTINEL
@@ -5581,29 +5626,29 @@ static const ARMCPRegInfo el2_cp_reginfo[] = {
       .fieldoffset = offsetof(CPUARMState, cp15.cnthctl_el2) },
     { .name = "CNTVOFF_EL2", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 4, .crn = 14, .crm = 0, .opc2 = 3,
-      .access = PL2_RW, .type = ARM_CP_IO, .resetvalue = 0,
+      .access = PL2_RW, .type = ARM_CP_PER_CPU, .resetvalue = 0,
       .writefn = gt_cntvoff_write,
       .fieldoffset = offsetof(CPUARMState, cp15.cntvoff_el2) },
     { .name = "CNTVOFF", .cp = 15, .opc1 = 4, .crm = 14,
-      .access = PL2_RW, .type = ARM_CP_64BIT | ARM_CP_ALIAS | ARM_CP_IO,
+      .access = PL2_RW, .type = ARM_CP_64BIT | ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .writefn = gt_cntvoff_write,
       .fieldoffset = offsetof(CPUARMState, cp15.cntvoff_el2) },
     { .name = "CNTHP_CVAL_EL2", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 4, .crn = 14, .crm = 2, .opc2 = 2,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_HYP].cval),
-      .type = ARM_CP_IO, .access = PL2_RW,
+      .type = ARM_CP_PER_CPU, .access = PL2_RW,
       .writefn = gt_hyp_cval_write, .raw_writefn = raw_write },
     { .name = "CNTHP_CVAL", .cp = 15, .opc1 = 6, .crm = 14,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_HYP].cval),
-      .access = PL2_RW, .type = ARM_CP_64BIT | ARM_CP_IO,
+      .access = PL2_RW, .type = ARM_CP_64BIT | ARM_CP_PER_CPU,
       .writefn = gt_hyp_cval_write, .raw_writefn = raw_write },
     { .name = "CNTHP_TVAL_EL2", .state = ARM_CP_STATE_BOTH,
       .opc0 = 3, .opc1 = 4, .crn = 14, .crm = 2, .opc2 = 0,
-      .type = ARM_CP_NO_RAW | ARM_CP_IO, .access = PL2_RW,
+      .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU, .access = PL2_RW,
       .resetfn = gt_hyp_timer_reset,
       .readfn = gt_hyp_tval_read, .writefn = gt_hyp_tval_write },
     { .name = "CNTHP_CTL_EL2", .state = ARM_CP_STATE_BOTH,
-      .type = ARM_CP_IO,
+      .type = ARM_CP_PER_CPU,
       .opc0 = 3, .opc1 = 4, .crn = 14, .crm = 2, .opc2 = 1,
       .access = PL2_RW,
       .fieldoffset = offsetof(CPUARMState, cp15.c14_timer[GTIMER_HYP].ctl),
@@ -6516,7 +6561,7 @@ static void define_pmu_regs(ARMCPU *cpu)
     ARMCPRegInfo pmcr = {
         .name = "PMCR", .cp = 15, .crn = 9, .crm = 12, .opc1 = 0, .opc2 = 0,
         .access = PL0_RW,
-        .type = ARM_CP_IO | ARM_CP_ALIAS,
+        .type = ARM_CP_PER_CPU | ARM_CP_ALIAS,
         .fieldoffset = offsetoflow32(CPUARMState, cp15.c9_pmcr),
         .accessfn = pmreg_access, .writefn = pmcr_write,
         .raw_writefn = raw_write,
@@ -6525,7 +6570,7 @@ static void define_pmu_regs(ARMCPU *cpu)
         .name = "PMCR_EL0", .state = ARM_CP_STATE_AA64,
         .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 12, .opc2 = 0,
         .access = PL0_RW, .accessfn = pmreg_access,
-        .type = ARM_CP_IO,
+        .type = ARM_CP_PER_CPU,
         .fieldoffset = offsetof(CPUARMState, cp15.c9_pmcr),
         .resetvalue = (cpu->midr & 0xff000000) | (pmcrn << PMCRN_SHIFT) |
                       PMCRLC,
@@ -6541,25 +6586,25 @@ static void define_pmu_regs(ARMCPU *cpu)
         ARMCPRegInfo pmev_regs[] = {
             { .name = pmevcntr_name, .cp = 15, .crn = 14,
               .crm = 8 | (3 & (i >> 3)), .opc1 = 0, .opc2 = i & 7,
-              .access = PL0_RW, .type = ARM_CP_IO | ARM_CP_ALIAS,
+              .access = PL0_RW, .type = ARM_CP_PER_CPU | ARM_CP_ALIAS,
               .readfn = pmevcntr_readfn, .writefn = pmevcntr_writefn,
               .accessfn = pmreg_access },
             { .name = pmevcntr_el0_name, .state = ARM_CP_STATE_AA64,
               .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 8 | (3 & (i >> 3)),
               .opc2 = i & 7, .access = PL0_RW, .accessfn = pmreg_access,
-              .type = ARM_CP_IO,
+              .type = ARM_CP_PER_CPU,
               .readfn = pmevcntr_readfn, .writefn = pmevcntr_writefn,
               .raw_readfn = pmevcntr_rawread,
               .raw_writefn = pmevcntr_rawwrite },
             { .name = pmevtyper_name, .cp = 15, .crn = 14,
               .crm = 12 | (3 & (i >> 3)), .opc1 = 0, .opc2 = i & 7,
-              .access = PL0_RW, .type = ARM_CP_IO | ARM_CP_ALIAS,
+              .access = PL0_RW, .type = ARM_CP_PER_CPU | ARM_CP_ALIAS,
               .readfn = pmevtyper_readfn, .writefn = pmevtyper_writefn,
               .accessfn = pmreg_access },
             { .name = pmevtyper_el0_name, .state = ARM_CP_STATE_AA64,
               .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 12 | (3 & (i >> 3)),
               .opc2 = i & 7, .access = PL0_RW, .accessfn = pmreg_access,
-              .type = ARM_CP_IO,
+              .type = ARM_CP_PER_CPU,
               .readfn = pmevtyper_readfn, .writefn = pmevtyper_writefn,
               .raw_writefn = pmevtyper_rawwrite },
             REGINFO_SENTINEL
@@ -9563,8 +9608,10 @@ void arm_cpu_do_interrupt(CPUState *cs)
     unsigned int new_el = env->exception.target_el;
     g_assert(!cpu_mutex_locked(cs));
     g_assert(!qemu_mutex_iothread_locked());
-    qemu_mutex_lock_iothread();
-
+    bool bql = !env->gicv3state && !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
     assert(!arm_feature(env, ARM_FEATURE_M));
 
     arm_log_exception(cs->exception_index);
@@ -9598,6 +9645,7 @@ void arm_cpu_do_interrupt(CPUState *cs)
 #endif
 
     /* Hooks may change global state so BQL should be held */
+
     arm_call_pre_el_change_hook(cpu);
     assert(!excp_is_internal(cs->exception_index));
     if (arm_el_is_aa64(env, new_el)) {
@@ -9611,7 +9659,9 @@ void arm_cpu_do_interrupt(CPUState *cs)
     if (!kvm_enabled()) {
         cpu_interrupt_request_or(cs, CPU_INTERRUPT_EXITTB);
     }
-    qemu_mutex_unlock_iothread();
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 #endif /* !CONFIG_USER_ONLY */
 

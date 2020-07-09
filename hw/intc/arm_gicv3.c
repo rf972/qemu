@@ -21,6 +21,7 @@
 #include "hw/sysbus.h"
 #include "hw/intc/arm_gicv3.h"
 #include "gicv3_internal.h"
+#include "hw/core/cpu.h"
 
 static bool irqbetter(GICv3CPUState *cs, int irq, uint8_t prio)
 {
@@ -142,6 +143,8 @@ static void gicv3_redist_update_noirqset(GICv3CPUState *cs)
     uint8_t prio;
     int i;
     uint32_t pend;
+    
+    g_assert(arm_gic_locked(cs->gic));
 
     /* Find out which redistributor interrupts are eligible to be
      * signaled to the CPU interface.
@@ -188,6 +191,7 @@ static void gicv3_redist_update_noirqset(GICv3CPUState *cs)
  */
 void gicv3_redist_update(GICv3CPUState *cs)
 {
+    g_assert(arm_gic_locked(cs->gic));
     gicv3_redist_update_noirqset(cs);
     gicv3_cpuif_update(cs);
 }
@@ -265,6 +269,8 @@ static void gicv3_update_noirqset(GICv3State *s, int start, int len)
 void gicv3_update(GICv3State *s, int start, int len)
 {
     int i;
+    
+    g_assert(arm_gic_locked(s));
 
     gicv3_update_noirqset(s, start, len);
     for (i = 0; i < s->num_cpu; i++) {
@@ -278,6 +284,8 @@ void gicv3_full_update_noirqset(GICv3State *s)
      * don't update any outbound IRQ lines.
      */
     int i;
+    
+    g_assert(arm_gic_locked(s));
 
     for (i = 0; i < s->num_cpu; i++) {
         s->cpu[i].hppi.prio = 0xff;
@@ -301,13 +309,15 @@ void gicv3_full_update(GICv3State *s)
      * updating outbound IRQ lines.
      */
     int i;
+    
+    g_assert(arm_gic_locked(s));
 
     gicv3_full_update_noirqset(s);
     for (i = 0; i < s->num_cpu; i++) {
         gicv3_cpuif_update(&s->cpu[i]);
     }
 }
-
+static uint64_t gic_set_irq_count = 0;
 /* Process a change in an external IRQ input. */
 static void gicv3_set_irq(void *opaque, int irq, int level)
 {
@@ -318,9 +328,17 @@ static void gicv3_set_irq(void *opaque, int irq, int level)
      *  ...
      */
     GICv3State *s = opaque;
-
+    bool unlock_bql = qemu_mutex_iothread_locked();
+    bool lock_gic = !arm_gic_locked(s);
+    if (unlock_bql) {
+        atomic_inc(&gic_set_irq_count);
+    }
+    if (lock_gic) {
+        arm_gic_lock(s);
+    }
     if (irq < (s->num_irq - GIC_INTERNAL)) {
         /* external interrupt (SPI) */
+        //printf("%s irq: %d level: %d\n", __func__, irq, level);
         gicv3_dist_set_irq(s, irq + GIC_INTERNAL, level);
     } else {
         /* per-cpu interrupt (PPI) */
@@ -334,7 +352,11 @@ static void gicv3_set_irq(void *opaque, int irq, int level)
          * model wires up interrupts.
          */
         assert(irq >= GIC_NR_SGIS);
+        //printf("[%d] %s irq: %d level: %d\n", cpu, __func__, irq, level);
         gicv3_redist_set_irq(&s->cpu[cpu], irq, level);
+    }
+    if (lock_gic) {
+        arm_gic_unlock(s);
     }
 }
 
@@ -360,7 +382,39 @@ static const MemoryRegionOps gic_ops[] = {
         .endianness = DEVICE_NATIVE_ENDIAN,
     }
 };
+#if 1
+static __thread bool gic_lock_held = false;
+//static __thread bool gic_unlock_bql = false;
+//static volatile bool gic_allow_bql = true;
+//static uint64_t gic_drop_bql = 0;
+#endif
+void arm_gic_lock_impl(GICv3State *s, const char *file, int line)
+{
+    QemuMutexLockFunc lock = atomic_read(&qemu_mutex_lock_func);
+   // g_assert(qemu_mutex_iothread_locked());
 
+    //gic_unlock_bql = qemu_mutex_iothread_locked();
+    //if (gic_allow_bql && gic_unlock_bql) {
+        //qemu_mutex_unlock_iothread();
+     //   atomic_fetch_add(&gic_drop_bql, 1);
+    //}
+    g_assert(!arm_gic_locked(s));
+    lock(&s->mutex, file, line);
+    gic_lock_held = true;
+}
+void arm_gic_unlock_impl(GICv3State *s, const char *file, int line)
+{
+    g_assert(arm_gic_locked(s));
+    gic_lock_held = false;
+    qemu_mutex_unlock_impl(&s->mutex, file, line);
+    //if (gic_allow_bql && gic_unlock_bql) {
+    //    qemu_mutex_lock_iothread();
+    //}
+}
+bool arm_gic_locked(GICv3State *s)
+{
+    return(gic_lock_held);
+}
 static void arm_gic_realize(DeviceState *dev, Error **errp)
 {
     /* Device instance realize function for the GIC sysbus device */
@@ -379,6 +433,8 @@ static void arm_gic_realize(DeviceState *dev, Error **errp)
                    s->nb_redist_regions);
         return;
     }
+
+    qemu_mutex_init(&s->mutex);
 
     gicv3_init_irqs_and_mmio(s, gicv3_set_irq, gic_ops, &local_err);
     if (local_err) {

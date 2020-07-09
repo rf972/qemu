@@ -291,6 +291,7 @@ void gicv3_init_irqs_and_mmio(GICv3State *s, qemu_irq_handler handler,
 
     memory_region_init_io(&s->iomem_dist, OBJECT(s), ops, s,
                           "gicv3_dist", 0x10000);
+    memory_region_clear_global_locking(&s->iomem_dist);
     sysbus_init_mmio(sbd, &s->iomem_dist);
 
     s->iomem_redist = g_new0(MemoryRegion, s->nb_redist_regions);
@@ -300,6 +301,7 @@ void gicv3_init_irqs_and_mmio(GICv3State *s, qemu_irq_handler handler,
         memory_region_init_io(&s->iomem_redist[i], OBJECT(s),
                               ops ? &ops[1] : NULL, s, name,
                               s->redist_region_count[i] * GICV3_REDIST_SIZE);
+        memory_region_clear_global_locking(&s->iomem_redist[i]);
         sysbus_init_mmio(sbd, &s->iomem_redist[i]);
         g_free(name);
     }
