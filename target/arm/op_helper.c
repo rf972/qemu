@@ -695,6 +695,7 @@ void HELPER(set_cp_reg)(CPUARMState *env, void *rip, uint32_t value)
 {
     const ARMCPRegInfo *ri = rip;
 
+    g_assert((ri->type & ARM_CP_PER_CPU) == 0);
     if (ri->type & ARM_CP_IO) {
         qemu_mutex_lock_iothread();
         ri->writefn(env, ri, value);
@@ -708,6 +709,7 @@ uint32_t HELPER(get_cp_reg)(CPUARMState *env, void *rip)
 {
     const ARMCPRegInfo *ri = rip;
     uint32_t res;
+    g_assert((ri->type & ARM_CP_PER_CPU) == 0);
 
     if (ri->type & ARM_CP_IO) {
         qemu_mutex_lock_iothread();
@@ -728,6 +730,12 @@ void HELPER(set_cp_reg64)(CPUARMState *env, void *rip, uint64_t value)
         qemu_mutex_lock_iothread();
         ri->writefn(env, ri, value);
         qemu_mutex_unlock_iothread();
+    } else if (ri->type & ARM_CP_PER_CPU) {
+        CPUState *cs = env_cpu(env);
+        g_assert(!cpu_mutex_locked(cs));
+        cpu_mutex_lock(cs);
+        ri->writefn(env, ri, value);
+        cpu_mutex_unlock(cs);
     } else {
         ri->writefn(env, ri, value);
     }
@@ -742,6 +750,12 @@ uint64_t HELPER(get_cp_reg64)(CPUARMState *env, void *rip)
         qemu_mutex_lock_iothread();
         res = ri->readfn(env, ri);
         qemu_mutex_unlock_iothread();
+    } else if (ri->type & ARM_CP_PER_CPU) {
+        CPUState *cs = env_cpu(env);
+        g_assert(!cpu_mutex_locked(cs));
+        cpu_mutex_lock(cs);
+        res = ri->readfn(env, ri);
+        cpu_mutex_unlock(cs);
     } else {
         res = ri->readfn(env, ri);
     }
