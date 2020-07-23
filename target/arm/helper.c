@@ -1499,6 +1499,7 @@ static bool pmu_counter_enabled(CPUARMState *env, uint8_t counter)
 static void pmu_update_irq(CPUARMState *env)
 {
     ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     qemu_set_irq(cpu->pmu_interrupt, (env->cp15.c9_pmcr & PMCRE) &&
             (env->cp15.c9_pminten & env->cp15.c9_pmovsr));
 }
@@ -1512,6 +1513,8 @@ static void pmu_update_irq(CPUARMState *env)
 static void pmccntr_op_start(CPUARMState *env)
 {
     uint64_t cycles = cycles_get_count(env);
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
 
     if (pmu_counter_enabled(env, 31)) {
         uint64_t eff_cycles = cycles;
@@ -1541,6 +1544,8 @@ static void pmccntr_op_start(CPUARMState *env)
  */
 static void pmccntr_op_finish(CPUARMState *env)
 {
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     if (pmu_counter_enabled(env, 31)) {
 #ifndef CONFIG_USER_ONLY
         /* Calculate when the counter will next overflow */
@@ -1572,6 +1577,8 @@ static void pmevcntr_op_start(CPUARMState *env, uint8_t counter)
 
     uint16_t event = env->cp15.c14_pmevtyper[counter] & PMXEVTYPER_EVTCOUNT;
     uint64_t count = 0;
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     if (event_supported(event)) {
         uint16_t event_idx = supported_event_map[event];
         count = pm_events[event_idx].get_count(env);
@@ -1591,6 +1598,8 @@ static void pmevcntr_op_start(CPUARMState *env, uint8_t counter)
 
 static void pmevcntr_op_finish(CPUARMState *env, uint8_t counter)
 {
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     if (pmu_counter_enabled(env, counter)) {
 #ifndef CONFIG_USER_ONLY
         uint16_t event = env->cp15.c14_pmevtyper[counter] & PMXEVTYPER_EVTCOUNT;
@@ -1615,6 +1624,8 @@ static void pmevcntr_op_finish(CPUARMState *env, uint8_t counter)
 void pmu_op_start(CPUARMState *env)
 {
     unsigned int i;
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     pmccntr_op_start(env);
     for (i = 0; i < pmu_num_counters(env); i++) {
         pmevcntr_op_start(env, i);
@@ -1624,6 +1635,8 @@ void pmu_op_start(CPUARMState *env)
 void pmu_op_finish(CPUARMState *env)
 {
     unsigned int i;
+    ARMCPU *cpu = env_archcpu(env);
+    g_assert(cpu_mutex_locked(&cpu->parent_obj));
     pmccntr_op_finish(env);
     for (i = 0; i < pmu_num_counters(env); i++) {
         pmevcntr_op_finish(env, i);
@@ -1632,12 +1645,18 @@ void pmu_op_finish(CPUARMState *env)
 
 void pmu_pre_el_change(ARMCPU *cpu, void *ignored)
 {
+    g_assert(!cpu_mutex_locked(&cpu->parent_obj));
+    cpu_mutex_lock(&cpu->parent_obj);
     pmu_op_start(&cpu->env);
+    cpu_mutex_unlock(&cpu->parent_obj);
 }
 
 void pmu_post_el_change(ARMCPU *cpu, void *ignored)
 {
+    g_assert(!cpu_mutex_locked(&cpu->parent_obj));
+    cpu_mutex_lock(&cpu->parent_obj);
     pmu_op_finish(&cpu->env);
+    cpu_mutex_unlock(&cpu->parent_obj);
 }
 
 void arm_pmu_timer_cb(void *opaque)
@@ -2167,7 +2186,7 @@ static const ARMCPRegInfo v7_cp_reginfo[] = {
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pmcnten),
       .writefn = pmcntenclr_write },
     { .name = "PMOVSR", .cp = 15, .crn = 9, .crm = 12, .opc1 = 0, .opc2 = 3,
-      .access = PL0_RW, .type = ARM_CP_IO,
+      .access = PL0_RW, .type = ARM_CP_PER_CPU,
       .fieldoffset = offsetoflow32(CPUARMState, cp15.c9_pmovsr),
       .accessfn = pmreg_access,
       .writefn = pmovsr_write,
@@ -2175,18 +2194,18 @@ static const ARMCPRegInfo v7_cp_reginfo[] = {
     { .name = "PMOVSCLR_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 12, .opc2 = 3,
       .access = PL0_RW, .accessfn = pmreg_access,
-      .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pmovsr),
       .writefn = pmovsr_write,
       .raw_writefn = raw_write },
     { .name = "PMSWINC", .cp = 15, .crn = 9, .crm = 12, .opc1 = 0, .opc2 = 4,
       .access = PL0_W, .accessfn = pmreg_access_swinc,
-      .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .writefn = pmswinc_write },
     { .name = "PMSWINC_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 12, .opc2 = 4,
       .access = PL0_W, .accessfn = pmreg_access_swinc,
-      .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .writefn = pmswinc_write },
     { .name = "PMSELR", .cp = 15, .crn = 9, .crm = 12, .opc1 = 0, .opc2 = 5,
       .access = PL0_RW, .type = ARM_CP_ALIAS,
@@ -2199,44 +2218,44 @@ static const ARMCPRegInfo v7_cp_reginfo[] = {
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pmselr),
       .writefn = pmselr_write, .raw_writefn = raw_write, },
     { .name = "PMCCNTR", .cp = 15, .crn = 9, .crm = 13, .opc1 = 0, .opc2 = 0,
-      .access = PL0_RW, .resetvalue = 0, .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .access = PL0_RW, .resetvalue = 0, .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .readfn = pmccntr_read, .writefn = pmccntr_write32,
       .accessfn = pmreg_access_ccntr },
     { .name = "PMCCNTR_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 13, .opc2 = 0,
       .access = PL0_RW, .accessfn = pmreg_access_ccntr,
-      .type = ARM_CP_IO,
+      .type = ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c15_ccnt),
       .readfn = pmccntr_read, .writefn = pmccntr_write,
       .raw_readfn = raw_read, .raw_writefn = raw_write, },
     { .name = "PMCCFILTR", .cp = 15, .opc1 = 0, .crn = 14, .crm = 15, .opc2 = 7,
       .writefn = pmccfiltr_write_a32, .readfn = pmccfiltr_read_a32,
       .access = PL0_RW, .accessfn = pmreg_access,
-      .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .resetvalue = 0, },
     { .name = "PMCCFILTR_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 15, .opc2 = 7,
       .writefn = pmccfiltr_write, .raw_writefn = raw_write,
       .access = PL0_RW, .accessfn = pmreg_access,
-      .type = ARM_CP_IO,
+      .type = ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.pmccfiltr_el0),
       .resetvalue = 0, },
     { .name = "PMXEVTYPER", .cp = 15, .crn = 9, .crm = 13, .opc1 = 0, .opc2 = 1,
-      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = pmreg_access,
       .writefn = pmxevtyper_write, .readfn = pmxevtyper_read },
     { .name = "PMXEVTYPER_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 13, .opc2 = 1,
-      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = pmreg_access,
       .writefn = pmxevtyper_write, .readfn = pmxevtyper_read },
     { .name = "PMXEVCNTR", .cp = 15, .crn = 9, .crm = 13, .opc1 = 0, .opc2 = 2,
-      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = pmreg_access_xevcntr,
       .writefn = pmxevcntr_write, .readfn = pmxevcntr_read },
     { .name = "PMXEVCNTR_EL0", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 13, .opc2 = 2,
-      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_IO,
+      .access = PL0_RW, .type = ARM_CP_NO_RAW | ARM_CP_PER_CPU,
       .accessfn = pmreg_access_xevcntr,
       .writefn = pmxevcntr_write, .readfn = pmxevcntr_read },
     { .name = "PMUSERENR", .cp = 15, .crn = 9, .crm = 14, .opc1 = 0, .opc2 = 0,
@@ -2252,26 +2271,26 @@ static const ARMCPRegInfo v7_cp_reginfo[] = {
       .writefn = pmuserenr_write, .raw_writefn = raw_write },
     { .name = "PMINTENSET", .cp = 15, .crn = 9, .crm = 14, .opc1 = 0, .opc2 = 1,
       .access = PL1_RW, .accessfn = access_tpm,
-      .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .fieldoffset = offsetoflow32(CPUARMState, cp15.c9_pminten),
       .resetvalue = 0,
       .writefn = pmintenset_write, .raw_writefn = raw_write },
     { .name = "PMINTENSET_EL1", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 0, .crn = 9, .crm = 14, .opc2 = 1,
       .access = PL1_RW, .accessfn = access_tpm,
-      .type = ARM_CP_IO,
+      .type = ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pminten),
       .writefn = pmintenset_write, .raw_writefn = raw_write,
       .resetvalue = 0x0 },
     { .name = "PMINTENCLR", .cp = 15, .crn = 9, .crm = 14, .opc1 = 0, .opc2 = 2,
       .access = PL1_RW, .accessfn = access_tpm,
-      .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pminten),
       .writefn = pmintenclr_write, },
     { .name = "PMINTENCLR_EL1", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 0, .crn = 9, .crm = 14, .opc2 = 2,
       .access = PL1_RW, .accessfn = access_tpm,
-      .type = ARM_CP_ALIAS | ARM_CP_IO,
+      .type = ARM_CP_ALIAS | ARM_CP_PER_CPU,
       .fieldoffset = offsetof(CPUARMState, cp15.c9_pminten),
       .writefn = pmintenclr_write },
     { .name = "CCSIDR", .state = ARM_CP_STATE_BOTH,
@@ -6516,7 +6535,7 @@ static void define_pmu_regs(ARMCPU *cpu)
     ARMCPRegInfo pmcr = {
         .name = "PMCR", .cp = 15, .crn = 9, .crm = 12, .opc1 = 0, .opc2 = 0,
         .access = PL0_RW,
-        .type = ARM_CP_IO | ARM_CP_ALIAS,
+        .type = ARM_CP_PER_CPU | ARM_CP_ALIAS,
         .fieldoffset = offsetoflow32(CPUARMState, cp15.c9_pmcr),
         .accessfn = pmreg_access, .writefn = pmcr_write,
         .raw_writefn = raw_write,
@@ -6525,7 +6544,7 @@ static void define_pmu_regs(ARMCPU *cpu)
         .name = "PMCR_EL0", .state = ARM_CP_STATE_AA64,
         .opc0 = 3, .opc1 = 3, .crn = 9, .crm = 12, .opc2 = 0,
         .access = PL0_RW, .accessfn = pmreg_access,
-        .type = ARM_CP_IO,
+        .type = ARM_CP_PER_CPU,
         .fieldoffset = offsetof(CPUARMState, cp15.c9_pmcr),
         .resetvalue = (cpu->midr & 0xff000000) | (pmcrn << PMCRN_SHIFT) |
                       PMCRLC,
@@ -6541,25 +6560,25 @@ static void define_pmu_regs(ARMCPU *cpu)
         ARMCPRegInfo pmev_regs[] = {
             { .name = pmevcntr_name, .cp = 15, .crn = 14,
               .crm = 8 | (3 & (i >> 3)), .opc1 = 0, .opc2 = i & 7,
-              .access = PL0_RW, .type = ARM_CP_IO | ARM_CP_ALIAS,
+              .access = PL0_RW, .type = ARM_CP_PER_CPU | ARM_CP_ALIAS,
               .readfn = pmevcntr_readfn, .writefn = pmevcntr_writefn,
               .accessfn = pmreg_access },
             { .name = pmevcntr_el0_name, .state = ARM_CP_STATE_AA64,
               .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 8 | (3 & (i >> 3)),
               .opc2 = i & 7, .access = PL0_RW, .accessfn = pmreg_access,
-              .type = ARM_CP_IO,
+              .type = ARM_CP_PER_CPU,
               .readfn = pmevcntr_readfn, .writefn = pmevcntr_writefn,
               .raw_readfn = pmevcntr_rawread,
               .raw_writefn = pmevcntr_rawwrite },
             { .name = pmevtyper_name, .cp = 15, .crn = 14,
               .crm = 12 | (3 & (i >> 3)), .opc1 = 0, .opc2 = i & 7,
-              .access = PL0_RW, .type = ARM_CP_IO | ARM_CP_ALIAS,
+              .access = PL0_RW, .type = ARM_CP_PER_CPU | ARM_CP_ALIAS,
               .readfn = pmevtyper_readfn, .writefn = pmevtyper_writefn,
               .accessfn = pmreg_access },
             { .name = pmevtyper_el0_name, .state = ARM_CP_STATE_AA64,
               .opc0 = 3, .opc1 = 3, .crn = 14, .crm = 12 | (3 & (i >> 3)),
               .opc2 = i & 7, .access = PL0_RW, .accessfn = pmreg_access,
-              .type = ARM_CP_IO,
+              .type = ARM_CP_PER_CPU,
               .readfn = pmevtyper_readfn, .writefn = pmevtyper_writefn,
               .raw_writefn = pmevtyper_rawwrite },
             REGINFO_SENTINEL
