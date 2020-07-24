@@ -738,10 +738,12 @@ void HELPER(set_cp_reg64)(CPUARMState *env, void *rip, uint64_t value)
         arm_cpu_gic_unlock_impl(cs, ri->name, __LINE__);
     } else if (ri->type & ARM_CP_PER_CPU) {
         CPUState *cs = env_cpu(env);
+        arm_cpu_gic_lock_impl(cs, ri->name, __LINE__);
         g_assert(!cpu_mutex_locked(cs));
         cpu_mutex_lock(cs);
         ri->writefn(env, ri, value);
         cpu_mutex_unlock(cs);
+        arm_cpu_gic_unlock_impl(cs, ri->name, __LINE__);
     } else {
         ri->writefn(env, ri, value);
     }
