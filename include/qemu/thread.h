@@ -109,6 +109,22 @@ static inline void (qemu_mutex_lock)(QemuMutex *mutex)
     qemu_mutex_lock(mutex);
 }
 
+static inline void(qemu_mutex_lock_loc)(QemuMutex *mutex, 
+                                        const char *file,
+                                        int line)
+{
+    QemuMutexLockFunc fn = atomic_read(&qemu_mutex_lock_func);
+    fn(mutex, file, line);
+}
+
+static inline void(qemu_rec_mutex_lock_loc)(QemuMutex *mutex, 
+                                            const char *file,
+                                            int line)
+{
+    QemuMutexLockFunc fn = atomic_read(&qemu_rec_mutex_lock_func);
+    fn(mutex, file, line);
+}
+
 static inline int (qemu_mutex_trylock)(QemuMutex *mutex)
 {
     return qemu_mutex_trylock(mutex);
