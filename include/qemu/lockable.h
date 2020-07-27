@@ -16,12 +16,15 @@
 #include "qemu/coroutine.h"
 #include "qemu/thread.h"
 
-typedef void QemuLockUnlockFunc(void *);
+typedef void QemuLockFunc(void *, const char *file, int line);
+typedef void QemuUnlockFunc(void *);
 
 struct QemuLockable {
     void *object;
-    QemuLockUnlockFunc *lock;
-    QemuLockUnlockFunc *unlock;
+    const char * file;
+    int line;
+    QemuLockFunc *lock;
+    QemuUnlockFunc *unlock;
 };
 
 /* This function gives an error if an invalid, non-NULL pointer type is passed
@@ -47,15 +50,15 @@ qemu_make_lockable(void *x, QemuLockable *lockable)
 }
 
 /* Auxiliary macros to simplify QEMU_MAKE_LOCABLE.  */
-#define QEMU_LOCK_FUNC(x) ((QemuLockUnlockFunc *)    \
-    QEMU_GENERIC(x,                                  \
-                 (QemuMutex *, qemu_mutex_lock),     \
-                 (QemuRecMutex *, qemu_rec_mutex_lock), \
-                 (CoMutex *, qemu_co_mutex_lock),    \
-                 (QemuSpin *, qemu_spin_lock),       \
+#define QEMU_LOCK_FUNC(x) ((QemuLockFunc *)             \
+    QEMU_GENERIC(x,                                     \
+                 (QemuMutex *, qemu_mutex_lock_site),   \
+                 (QemuRecMutex *, qemu_mutex_lock_site),\
+                 (CoMutex *, qemu_co_mutex_lock_site),  \
+                 (QemuSpin *, qemu_spin_lock_site),     \
                  unknown_lock_type))
 
-#define QEMU_UNLOCK_FUNC(x) ((QemuLockUnlockFunc *)  \
+#define QEMU_UNLOCK_FUNC(x) ((QemuUnlockFunc *)      \
     QEMU_GENERIC(x,                                  \
                  (QemuMutex *, qemu_mutex_unlock),   \
                  (QemuRecMutex *, qemu_rec_mutex_unlock), \
@@ -67,8 +70,10 @@ qemu_make_lockable(void *x, QemuLockable *lockable)
  * In C++ it would be different, but then C++ wouldn't need QemuLockable
  * either...
  */
-#define QEMU_MAKE_LOCKABLE_(x) (&(QemuLockable) {     \
+#define QEMU_MAKE_LOCKABLE_(x) (&(QemuLockable) {    \
         .object = (x),                               \
+        .file = __FILE__,                            \
+        .line = __LINE__,                            \
         .lock = QEMU_LOCK_FUNC(x),                   \
         .unlock = QEMU_UNLOCK_FUNC(x),               \
     })
@@ -100,7 +105,7 @@ qemu_make_lockable(void *x, QemuLockable *lockable)
 
 static inline void qemu_lockable_lock(QemuLockable *x)
 {
-    x->lock(x->object);
+    x->lock(x->object, x->file, x->line);
 }
 
 static inline void qemu_lockable_unlock(QemuLockable *x)
