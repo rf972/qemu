@@ -167,6 +167,13 @@ void coroutine_fn qemu_co_mutex_lock(CoMutex *mutex);
  */
 void coroutine_fn qemu_co_mutex_unlock(CoMutex *mutex);
 
+static inline void (qemu_co_mutex_lock_site)(CoMutex *mutex,
+                                             const char *file,
+                                             int line)
+{
+    qemu_co_mutex_lock(mutex);
+}
+
 /**
  * Assert that the current coroutine holds @mutex.
  */

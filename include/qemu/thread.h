@@ -129,6 +129,22 @@ static inline int (qemu_rec_mutex_trylock)(QemuRecMutex *mutex)
     return qemu_rec_mutex_trylock(mutex);
 }
 
+static inline void(qemu_mutex_lock_site)(QemuMutex *mutex,
+                                         const char *file,
+                                         int line)
+{
+    QemuMutexLockFunc fn = atomic_read(&qemu_mutex_lock_func);
+    fn(mutex, file, line);
+}
+
+static inline void(qemu_rec_mutex_lock_site)(QemuRecMutex *mutex,
+                                             const char *file,
+                                             int line)
+{
+    QemuRecMutexLockFunc fn = atomic_read(&qemu_rec_mutex_lock_func);
+    fn(mutex, file, line);
+}
+
 /* Prototypes for other functions are in thread-posix.h/thread-win32.h.  */
 void qemu_rec_mutex_init(QemuRecMutex *mutex);
 
@@ -273,6 +289,13 @@ static inline void qemu_spin_unlock(QemuSpin *spin)
 #ifdef CONFIG_TSAN
     __tsan_mutex_post_unlock(spin, 0);
 #endif
+}
+
+static inline void(qemu_spin_lock_site)(QemuSpin *spin,
+                                        const char *file,
+                                        int line)
+{
+    qemu_spin_lock(spin);
 }
 
 struct QemuLockCnt {
