@@ -157,6 +157,8 @@ struct TranslationBlock;
  * @disas_set_info: Setup architecture specific components of disassembly info
  * @adjust_watchpoint_address: Perform a target-specific adjustment to an
  * address before attempting to match it against watchpoints.
+ * @bql_interrupt: Hold BQL while performing the cpu_exec_interupt
+ *                 or do_interrupt call.
  *
  * Represents a CPU family or model.
  */
@@ -227,6 +229,7 @@ typedef struct CPUClass {
     /* Keep non-pointer data at the end to minimize holes.  */
     int gdb_num_core_regs;
     bool gdb_stop_before_watchpoint;
+    bool bql_interrupt;
 } CPUClass;
 
 /*
@@ -587,6 +590,11 @@ static inline void cpu_tb_jmp_cache_clear(CPUState *cpu)
     for (i = 0; i < TB_JMP_CACHE_SIZE; i++) {
         atomic_set(&cpu->tb_jmp_cache[i], NULL);
     }
+}
+
+static inline void cpu_class_set_bql_interrupt(CPUClass *cc, bool bql)
+{
+    cc->bql_interrupt = bql;
 }
 
 /**
