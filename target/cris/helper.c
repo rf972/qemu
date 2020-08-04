@@ -45,8 +45,10 @@ void cris_cpu_do_interrupt(CPUState *cs)
     CRISCPU *cpu = CRIS_CPU(cs);
     CPUCRISState *env = &cpu->env;
 
+    qemu_mutex_lock_iothread();
     cs->exception_index = -1;
     env->pregs[PR_ERP] = env->pc;
+    qemu_mutex_unlock_iothread();
 }
 
 void crisv10_cpu_do_interrupt(CPUState *cs)
@@ -128,6 +130,10 @@ void crisv10_cpu_do_interrupt(CPUState *cs)
     CRISCPU *cpu = CRIS_CPU(cs);
     CPUCRISState *env = &cpu->env;
     int ex_vec = -1;
+    bool bql = !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
 
     D_LOG("exception index=%d interrupt_req=%d\n",
           cs->exception_index,
@@ -183,6 +189,9 @@ void crisv10_cpu_do_interrupt(CPUState *cs)
                   env->pregs[PR_CCS],
                   env->pregs[PR_PID],
                   env->pregs[PR_ERP]);
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 void cris_cpu_do_interrupt(CPUState *cs)
@@ -190,6 +199,10 @@ void cris_cpu_do_interrupt(CPUState *cs)
     CRISCPU *cpu = CRIS_CPU(cs);
     CPUCRISState *env = &cpu->env;
     int ex_vec = -1;
+    bool bql = !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
 
     D_LOG("exception index=%d interrupt_req=%d\n",
           cs->exception_index,
@@ -265,6 +278,9 @@ void cris_cpu_do_interrupt(CPUState *cs)
           env->pregs[PR_CCS],
           env->pregs[PR_PID],
           env->pregs[PR_ERP]);
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 hwaddr cris_cpu_get_phys_page_debug(CPUState *cs, vaddr addr)
@@ -294,6 +310,7 @@ bool cris_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     CRISCPU *cpu = CRIS_CPU(cs);
     CPUCRISState *env = &cpu->env;
     bool ret = false;
+    qemu_mutex_lock_iothread();
 
     if (interrupt_request & CPU_INTERRUPT_HARD
         && (env->pregs[PR_CCS] & I_FLAG)
@@ -315,6 +332,7 @@ bool cris_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
             ret = true;
         }
     }
+    qemu_mutex_unlock_iothread();
 
     return ret;
 }
