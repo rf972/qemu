@@ -9759,7 +9759,13 @@ void arm_cpu_do_interrupt(CPUState *cs)
 {
     ARMCPU *cpu = ARM_CPU(cs);
     CPUARMState *env = &cpu->env;
-    unsigned int new_el = env->exception.target_el;
+    unsigned int new_el;
+
+    bool bql = !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
+    new_el = env->exception.target_el;
 
     assert(!arm_feature(env, ARM_FEATURE_M));
 
@@ -9776,6 +9782,9 @@ void arm_cpu_do_interrupt(CPUState *cs)
     if (arm_is_psci_call(cpu, cs->exception_index)) {
         arm_handle_psci_call(cpu);
         qemu_log_mask(CPU_LOG_INT, "...handled as PSCI call\n");
+        if (bql) {
+            qemu_mutex_unlock_iothread();
+        }
         return;
     }
 
@@ -9787,6 +9796,9 @@ void arm_cpu_do_interrupt(CPUState *cs)
 #ifdef CONFIG_TCG
     if (cs->exception_index == EXCP_SEMIHOST) {
         handle_semihosting(cs);
+        if (bql) {
+            qemu_mutex_unlock_iothread();
+        }
         return;
     }
 #endif
@@ -9807,6 +9819,9 @@ void arm_cpu_do_interrupt(CPUState *cs)
 
     if (!kvm_enabled()) {
         cpu_interrupt_request_or(cs, CPU_INTERRUPT_EXITTB);
+    }
+    if (bql) {
+        qemu_mutex_unlock_iothread();
     }
 }
 #endif /* !CONFIG_USER_ONLY */
