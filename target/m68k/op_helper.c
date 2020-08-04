@@ -447,8 +447,10 @@ void m68k_cpu_do_interrupt(CPUState *cs)
 {
     M68kCPU *cpu = M68K_CPU(cs);
     CPUM68KState *env = &cpu->env;
-
+    
+    qemu_mutex_lock_iothread();
     do_interrupt_all(env, 0);
+    qemu_mutex_unlock_iothread();
 }
 
 static inline void do_interrupt_m68k_hardirq(CPUM68KState *env)
@@ -508,6 +510,7 @@ bool m68k_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
     M68kCPU *cpu = M68K_CPU(cs);
     CPUM68KState *env = &cpu->env;
+    qemu_mutex_lock_iothread();
 
     if (interrupt_request & CPU_INTERRUPT_HARD
         && ((env->sr & SR_I) >> SR_I_SHIFT) < env->pending_level) {
@@ -519,8 +522,10 @@ bool m68k_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
          */
         cs->exception_index = env->pending_vector;
         do_interrupt_m68k_hardirq(env);
+        qemu_mutex_unlock_iothread();
         return true;
     }
+    qemu_mutex_unlock_iothread();
     return false;
 }
 
