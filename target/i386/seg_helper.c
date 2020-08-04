@@ -1284,7 +1284,7 @@ void x86_cpu_do_interrupt(CPUState *cs)
 {
     X86CPU *cpu = X86_CPU(cs);
     CPUX86State *env = &cpu->env;
-
+    qemu_mutex_lock_iothread();
 #if defined(CONFIG_USER_ONLY)
     /* if user mode only, we simulate a fake exception
        which will be handled outside the cpu execution
@@ -1308,6 +1308,7 @@ void x86_cpu_do_interrupt(CPUState *cs)
         env->old_exception = -1;
     }
 #endif
+    qemu_mutex_unlock_iothread();
 }
 
 void do_interrupt_x86_hardirq(CPUX86State *env, int intno, int is_hw)
@@ -1320,9 +1321,10 @@ bool x86_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     X86CPU *cpu = X86_CPU(cs);
     CPUX86State *env = &cpu->env;
     int intno;
-
+    qemu_mutex_lock_iothread();
     interrupt_request = x86_cpu_pending_interrupt(cs, interrupt_request);
     if (!interrupt_request) {
+        qemu_mutex_unlock_iothread();
         return false;
     }
 
@@ -1377,6 +1379,7 @@ bool x86_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     }
 
     /* Ensure that no TB jump will be modified as the program flow was changed.  */
+    qemu_mutex_unlock_iothread();
     return true;
 }
 
