@@ -80,14 +80,17 @@ bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
 #if !defined(CONFIG_USER_ONLY)
     if (interrupt_request & CPU_INTERRUPT_HARD) {
+        qemu_mutex_lock_iothread();
         RISCVCPU *cpu = RISCV_CPU(cs);
         CPURISCVState *env = &cpu->env;
         int interruptno = riscv_cpu_local_irq_pending(env);
         if (interruptno >= 0) {
             cs->exception_index = RISCV_EXCP_INT_FLAG | interruptno;
             riscv_cpu_do_interrupt(cs);
+            qemu_mutex_unlock_iothread();
             return true;
         }
+        qemu_mutex_unlock_iothread();
     }
 #endif
     return false;
@@ -822,6 +825,10 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
  */
 void riscv_cpu_do_interrupt(CPUState *cs)
 {
+    bool bql = !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
 #if !defined(CONFIG_USER_ONLY)
 
     RISCVCPU *cpu = RISCV_CPU(cs);
@@ -832,12 +839,15 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     /* cs->exception is 32-bits wide unlike mcause which is XLEN-bits wide
      * so we mask off the MSB and separate into trap type and cause.
      */
-    bool async = !!(cs->exception_index & RISCV_EXCP_INT_FLAG);
-    target_ulong cause = cs->exception_index & RISCV_EXCP_INT_MASK;
-    target_ulong deleg = async ? env->mideleg : env->medeleg;
+    bool async;
+    target_ulong cause;
+    target_ulong deleg;
     target_ulong tval = 0;
     target_ulong htval = 0;
     target_ulong mtval2 = 0;
+    async = !!(cs->exception_index & RISCV_EXCP_INT_FLAG);
+    cause = cs->exception_index & RISCV_EXCP_INT_MASK;
+    deleg = async ? env->mideleg : env->medeleg;
 
     if (!async) {
         /* set tval to badaddr for traps with address information */
@@ -982,4 +992,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
 
 #endif
     cs->exception_index = EXCP_NONE; /* mark handled to qemu */
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
