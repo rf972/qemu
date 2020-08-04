@@ -69,7 +69,12 @@ void sparc_cpu_do_interrupt(CPUState *cs)
 {
     SPARCCPU *cpu = SPARC_CPU(cs);
     CPUSPARCState *env = &cpu->env;
-    int cwp, intno = cs->exception_index;
+    int cwp, intno;
+    bool bql = !qemu_mutex_iothread_locked();    
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
+    intno = cs->exception_index;
 
     /* Compute PSR before exposing state.  */
     if (env->cc_op != CC_OP_FLAGS) {
@@ -115,6 +120,9 @@ void sparc_cpu_do_interrupt(CPUState *cs)
                           "Error state",
                       cs->exception_index, excp_name_str(cs->exception_index));
         }
+        if (bql) {
+            qemu_mutex_unlock_iothread();
+        }
         return;
     }
 #endif
@@ -136,6 +144,9 @@ void sparc_cpu_do_interrupt(CPUState *cs)
         env->qemu_irq_ack(env, env->irq_manager, intno);
     }
 #endif
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 #if !defined(CONFIG_USER_ONLY)
