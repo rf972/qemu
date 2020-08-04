@@ -152,6 +152,10 @@ void lm32_cpu_do_interrupt(CPUState *cs)
 {
     LM32CPU *cpu = LM32_CPU(cs);
     CPULM32State *env = &cpu->env;
+    bool bql = !qemu_mutex_iothread_locked();    
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
 
     qemu_log_mask(CPU_LOG_INT,
             "exception at pc=%x type=%x\n", env->pc, cs->exception_index);
@@ -196,18 +200,24 @@ void lm32_cpu_do_interrupt(CPUState *cs)
                   cs->exception_index);
         break;
     }
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 bool lm32_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
     LM32CPU *cpu = LM32_CPU(cs);
     CPULM32State *env = &cpu->env;
+    qemu_mutex_lock_iothread();
 
     if ((interrupt_request & CPU_INTERRUPT_HARD) && (env->ie & IE_IE)) {
         cs->exception_index = EXCP_IRQ;
         lm32_cpu_do_interrupt(cs);
+        qemu_mutex_unlock_iothread();
         return true;
     }
+    qemu_mutex_unlock_iothread();
     return false;
 }
 
