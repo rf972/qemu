@@ -62,9 +62,12 @@ void superh_cpu_do_interrupt(CPUState *cs)
 {
     SuperHCPU *cpu = SUPERH_CPU(cs);
     CPUSH4State *env = &cpu->env;
-    int do_irq = cpu_interrupt_request(cs) & CPU_INTERRUPT_HARD;
-    int do_exp, irq_vector = cs->exception_index;
-
+    int do_irq;
+    int do_exp, irq_vector;
+    qemu_mutex_lock_iothread();
+    do_irq = cpu_interrupt_request(cs) & CPU_INTERRUPT_HARD;
+    irq_vector = cs->exception_index;
+    
     /* prioritize exceptions over interrupts */
 
     do_exp = cs->exception_index != -1;
@@ -79,9 +82,11 @@ void superh_cpu_do_interrupt(CPUState *cs)
                should be loaded with the kernel entry point.
                qemu_system_reset_request takes care of that.  */
             qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
+            qemu_mutex_unlock_iothread();
             return;
         }
         if (do_irq && !env->in_sleep) {
+            qemu_mutex_unlock_iothread();
             return; /* masked */
         }
     }
@@ -91,8 +96,9 @@ void superh_cpu_do_interrupt(CPUState *cs)
         irq_vector = sh_intc_get_pending_vector(env->intc_handle,
 						(env->sr >> 4) & 0xf);
         if (irq_vector == -1) {
+            qemu_mutex_unlock_iothread();
             return; /* masked */
-	}
+        }
     }
 
     if (qemu_loglevel_mask(CPU_LOG_INT)) {
@@ -180,14 +186,17 @@ void superh_cpu_do_interrupt(CPUState *cs)
             env->pc = env->vbr + 0x100;
             break;
         }
+        qemu_mutex_unlock_iothread();
         return;
     }
 
     if (do_irq) {
         env->intevt = irq_vector;
         env->pc = env->vbr + 0x600;
+        qemu_mutex_unlock_iothread();
         return;
     }
+    qemu_mutex_unlock_iothread();
 }
 
 static void update_itlb_use(CPUSH4State * env, int itlbnb)
