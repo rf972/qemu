@@ -30,6 +30,7 @@ bool avr_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     CPUClass *cc = CPU_GET_CLASS(cs);
     AVRCPU *cpu = AVR_CPU(cs);
     CPUAVRState *env = &cpu->env;
+    qemu_mutex_lock_iothread();
 
     if (interrupt_request & CPU_INTERRUPT_RESET) {
         if (cpu_interrupts_enabled(env)) {
@@ -53,6 +54,7 @@ bool avr_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
             ret = true;
         }
     }
+    qemu_mutex_unlock_iothread();
     return ret;
 }
 
@@ -61,10 +63,15 @@ void avr_cpu_do_interrupt(CPUState *cs)
     AVRCPU *cpu = AVR_CPU(cs);
     CPUAVRState *env = &cpu->env;
 
-    uint32_t ret = env->pc_w;
+    uint32_t ret;
     int vector = 0;
     int size = avr_feature(env, AVR_FEATURE_JMP_CALL) ? 2 : 1;
     int base = 0;
+    bool bql = !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
+    ret = env->pc_w;
 
     if (cs->exception_index == EXCP_RESET) {
         vector = 0;
@@ -87,6 +94,9 @@ void avr_cpu_do_interrupt(CPUState *cs)
     env->sregI = 0; /* clear Global Interrupt Flag */
 
     cs->exception_index = -1;
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 int avr_cpu_memory_rw_debug(CPUState *cs, vaddr addr, uint8_t *buf,
