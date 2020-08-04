@@ -52,7 +52,10 @@ void nios2_cpu_do_interrupt(CPUState *cs)
 {
     Nios2CPU *cpu = NIOS2_CPU(cs);
     CPUNios2State *env = &cpu->env;
-
+    bool bql = !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
     switch (cs->exception_index) {
     case EXCP_IRQ:
         assert(env->regs[CR_STATUS] & CR_STATUS_PIE);
@@ -197,6 +200,9 @@ void nios2_cpu_do_interrupt(CPUState *cs)
         cpu_abort(cs, "unhandled exception type=%d\n",
                   cs->exception_index);
         break;
+    }
+    if (bql) {
+        qemu_mutex_unlock_iothread();
     }
 }
 
