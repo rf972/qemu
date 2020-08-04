@@ -94,12 +94,20 @@ void hppa_cpu_do_interrupt(CPUState *cs)
 {
     HPPACPU *cpu = HPPA_CPU(cs);
     CPUHPPAState *env = &cpu->env;
-    int i = cs->exception_index;
-    target_ureg iaoq_f = env->iaoq_f;
-    target_ureg iaoq_b = env->iaoq_b;
-    uint64_t iasq_f = env->iasq_f;
-    uint64_t iasq_b = env->iasq_b;
-
+    int i;
+    target_ureg iaoq_f;
+    target_ureg iaoq_b;
+    uint64_t iasq_f;
+    uint64_t iasq_b;
+    bool bql = !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
+    i = cs->exception_index;
+    iaoq_f = env->iaoq_f;
+    iaoq_b = env->iaoq_b;
+    iasq_f = env->iasq_f;
+    iasq_b = env->iasq_b;
 #ifndef CONFIG_USER_ONLY
     target_ureg old_psw;
 
@@ -244,6 +252,9 @@ void hppa_cpu_do_interrupt(CPUState *cs)
                                env->cr[CR_IOR]));
     }
     cs->exception_index = -1;
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 bool hppa_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
@@ -251,6 +262,7 @@ bool hppa_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 #ifndef CONFIG_USER_ONLY
     HPPACPU *cpu = HPPA_CPU(cs);
     CPUHPPAState *env = &cpu->env;
+    qemu_mutex_lock_iothread();
 
     /* If interrupts are requested and enabled, raise them.  */
     if ((env->psw & PSW_I) && (interrupt_request & CPU_INTERRUPT_HARD)) {
@@ -258,6 +270,7 @@ bool hppa_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         hppa_cpu_do_interrupt(cs);
         return true;
     }
+    qemu_mutex_unlock_iothread();
 #endif
     return false;
 }
