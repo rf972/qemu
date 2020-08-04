@@ -32,10 +32,17 @@ void mb_cpu_do_interrupt(CPUState *cs)
 {
     MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
     CPUMBState *env = &cpu->env;
+    bool bql = !qemu_mutex_iothread_locked();    
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
 
     cs->exception_index = -1;
     env->res_addr = RES_ADDR_NONE;
     env->regs[14] = env->sregs[SR_PC];
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 bool mb_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
@@ -113,6 +120,10 @@ void mb_cpu_do_interrupt(CPUState *cs)
     MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
     CPUMBState *env = &cpu->env;
     uint32_t t;
+    bool bql = !qemu_mutex_iothread_locked();    
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
 
     /* IMM flag cannot propagate across a branch and into the dslot.  */
     assert(!((env->iflags & D_FLAG) && (env->iflags & IMM_FLAG)));
@@ -123,6 +134,9 @@ void mb_cpu_do_interrupt(CPUState *cs)
         case EXCP_HW_EXCP:
             if (!(env->pvr.regs[0] & PVR0_USE_EXC_MASK)) {
                 qemu_log_mask(LOG_GUEST_ERROR, "Exception raised on system without exceptions!\n");
+                if (bql) {
+                    qemu_mutex_unlock_iothread();
+                }
                 return;
             }
 
@@ -262,6 +276,9 @@ void mb_cpu_do_interrupt(CPUState *cs)
                       cs->exception_index);
             break;
     }
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 hwaddr mb_cpu_get_phys_page_debug(CPUState *cs, vaddr addr)
@@ -291,6 +308,7 @@ bool mb_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
     MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
     CPUMBState *env = &cpu->env;
+    qemu_mutex_lock_iothread();
 
     if ((interrupt_request & CPU_INTERRUPT_HARD)
         && (env->sregs[SR_MSR] & MSR_IE)
@@ -298,7 +316,9 @@ bool mb_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         && !(env->iflags & (D_FLAG | IMM_FLAG))) {
         cs->exception_index = EXCP_IRQ;
         mb_cpu_do_interrupt(cs);
+        qemu_mutex_unlock_iothread();
         return true;
     }
+    qemu_mutex_unlock_iothread();
     return false;
 }
