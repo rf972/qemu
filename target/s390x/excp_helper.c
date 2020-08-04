@@ -470,7 +470,10 @@ void s390_cpu_do_interrupt(CPUState *cs)
     S390CPU *cpu = S390_CPU(cs);
     CPUS390XState *env = &cpu->env;
     bool stopped = false;
-
+    bool bql = !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
     qemu_log_mask(CPU_LOG_INT, "%s: %d at psw=%" PRIx64 ":%" PRIx64 "\n",
                   __func__, cs->exception_index, env->psw.mask, env->psw.addr);
 
@@ -541,10 +544,14 @@ try_deliver:
         /* unhalt if we had a WAIT PSW somehwere in our injection chain */
         s390_cpu_unhalt(cpu);
     }
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 bool s390_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
+    qemu_mutex_lock_iothread();
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         S390CPU *cpu = S390_CPU(cs);
         CPUS390XState *env = &cpu->env;
@@ -552,10 +559,12 @@ bool s390_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         if (env->ex_value) {
             /* Execution of the target insn is indivisible from
                the parent EXECUTE insn.  */
+            qemu_mutex_unlock_iothread();
             return false;
         }
         if (s390_cpu_has_int(cpu)) {
             s390_cpu_do_interrupt(cs);
+            qemu_mutex_unlock_iothread();
             return true;
         }
         if (env->psw.mask & PSW_MASK_WAIT) {
@@ -564,6 +573,7 @@ bool s390_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
             cpu_interrupt(CPU(cpu), CPU_INTERRUPT_HALT);
         }
     }
+    qemu_mutex_unlock_iothread();
     return false;
 }
 
