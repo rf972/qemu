@@ -48,6 +48,10 @@ void rx_cpu_do_interrupt(CPUState *cs)
     CPURXState *env = &cpu->env;
     int do_irq = cs->interrupt_request & INT_FLAGS;
     uint32_t save_psw;
+    bool bql = !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
 
     env->in_sleep = 0;
 
@@ -117,6 +121,9 @@ void rx_cpu_do_interrupt(CPUState *cs)
                       (vec & 0xff), expname);
     }
     env->regs[0] = env->isp;
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 bool rx_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
@@ -124,6 +131,7 @@ bool rx_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     RXCPU *cpu = RXCPU(cs);
     CPURXState *env = &cpu->env;
     int accept = 0;
+    qemu_mutex_lock_iothread();
     /* hardware interrupt (Normal) */
     if ((interrupt_request & CPU_INTERRUPT_HARD) &&
         env->psw_i && (env->psw_ipl < env->req_ipl)) {
@@ -138,8 +146,10 @@ bool rx_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     }
     if (accept) {
         rx_cpu_do_interrupt(cs);
+        qemu_mutex_unlock_iothread();
         return true;
     }
+    qemu_mutex_unlock_iothread();
     return false;
 }
 
