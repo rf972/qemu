@@ -169,6 +169,7 @@ void helper_cp1_putc(target_ulong regval)
 
 bool uc32_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
+    qemu_mutex_lock_iothread();
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         UniCore32CPU *cpu = UNICORE32_CPU(cs);
         CPUUniCore32State *env = &cpu->env;
@@ -176,8 +177,10 @@ bool uc32_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         if (!(env->uncached_asr & ASR_I)) {
             cs->exception_index = UC32_EXCP_INTR;
             uc32_cpu_do_interrupt(cs);
+            qemu_mutex_unlock_iothread();
             return true;
         }
     }
+    qemu_mutex_unlock_iothread();
     return false;
 }
