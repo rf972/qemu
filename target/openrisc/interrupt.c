@@ -28,6 +28,10 @@
 
 void openrisc_cpu_do_interrupt(CPUState *cs)
 {
+    bool bql = !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
 #ifndef CONFIG_USER_ONLY
     OpenRISCCPU *cpu = OPENRISC_CPU(cs);
     CPUOpenRISCState *env = &cpu->env;
@@ -99,6 +103,9 @@ void openrisc_cpu_do_interrupt(CPUState *cs)
 #endif
 
     cs->exception_index = -1;
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 bool openrisc_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
@@ -106,6 +113,7 @@ bool openrisc_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     OpenRISCCPU *cpu = OPENRISC_CPU(cs);
     CPUOpenRISCState *env = &cpu->env;
     int idx = -1;
+    qemu_mutex_lock_iothread();
 
     if ((interrupt_request & CPU_INTERRUPT_HARD) && (env->sr & SR_IEE)) {
         idx = EXCP_INT;
@@ -116,7 +124,9 @@ bool openrisc_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     if (idx >= 0) {
         cs->exception_index = idx;
         openrisc_cpu_do_interrupt(cs);
+        qemu_mutex_unlock_iothread();
         return true;
     }
+    qemu_mutex_unlock_iothread();
     return false;
 }
