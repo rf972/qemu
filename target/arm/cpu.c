@@ -528,11 +528,16 @@ bool arm_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
     CPUClass *cc = CPU_GET_CLASS(cs);
     CPUARMState *env = cs->env_ptr;
-    uint32_t cur_el = arm_current_el(env);
-    bool secure = arm_is_secure(env);
-    uint64_t hcr_el2 = arm_hcr_el2_eff(env);
+    uint32_t cur_el;
+    bool secure;
+    uint64_t hcr_el2;
     uint32_t target_el;
     uint32_t excp_idx;
+
+    qemu_mutex_lock_iothread();
+    cur_el = arm_current_el(env);
+    secure = arm_is_secure(env);
+    hcr_el2 = arm_hcr_el2_eff(env);
 
     /* The prioritization of interrupts is IMPLEMENTATION DEFINED. */
 
@@ -568,12 +573,14 @@ bool arm_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
             goto found;
         }
     }
+    qemu_mutex_unlock_iothread();
     return false;
 
  found:
     cs->exception_index = excp_idx;
     env->exception.target_el = target_el;
     cc->do_interrupt(cs);
+    qemu_mutex_unlock_iothread();
     return true;
 }
 
