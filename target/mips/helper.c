@@ -1085,6 +1085,10 @@ static inline void set_badinstr_registers(CPUMIPSState *env)
 
 void mips_cpu_do_interrupt(CPUState *cs)
 {
+    bool bql = !qemu_mutex_iothread_locked();
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
 #if !defined(CONFIG_USER_ONLY)
     MIPSCPU *cpu = MIPS_CPU(cs);
     CPUMIPSState *env = &cpu->env;
@@ -1396,10 +1400,14 @@ void mips_cpu_do_interrupt(CPUState *cs)
     }
 #endif
     cs->exception_index = EXCP_NONE;
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 bool mips_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
+    qemu_mutex_lock_iothread();
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         MIPSCPU *cpu = MIPS_CPU(cs);
         CPUMIPSState *env = &cpu->env;
@@ -1410,9 +1418,11 @@ bool mips_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
             cs->exception_index = EXCP_EXT_INTERRUPT;
             env->error_code = 0;
             mips_cpu_do_interrupt(cs);
+            qemu_mutex_unlock_iothread();
             return true;
         }
     }
+    qemu_mutex_unlock_iothread();
     return false;
 }
 
