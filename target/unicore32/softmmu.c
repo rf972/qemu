@@ -81,6 +81,10 @@ void uc32_cpu_do_interrupt(CPUState *cs)
     CPUUniCore32State *env = &cpu->env;
     uint32_t addr;
     int new_mode;
+    bool bql = !qemu_mutex_iothread_locked();    
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
 
     switch (cs->exception_index) {
     case UC32_EXCP_PRIV:
@@ -118,6 +122,9 @@ void uc32_cpu_do_interrupt(CPUState *cs)
     env->regs[30] = env->regs[31];
     env->regs[31] = addr;
     cpu_interrupt_request_or(cs, CPU_INTERRUPT_EXITTB);
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 static int get_phys_addr_ucv2(CPUUniCore32State *env, uint32_t address,
