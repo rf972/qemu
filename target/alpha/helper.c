@@ -299,8 +299,12 @@ void alpha_cpu_do_interrupt(CPUState *cs)
 {
     AlphaCPU *cpu = ALPHA_CPU(cs);
     CPUAlphaState *env = &cpu->env;
-    int i = cs->exception_index;
-
+    int i;
+    bool bql = !qemu_mutex_iothread_locked();    
+    if (bql) {
+        qemu_mutex_lock_iothread();
+    }
+    i = cs->exception_index;
     if (qemu_loglevel_mask(CPU_LOG_INT)) {
         static int count;
         const char *name = "<unknown>";
@@ -405,6 +409,9 @@ void alpha_cpu_do_interrupt(CPUState *cs)
     /* Switch to PALmode.  */
     env->flags |= ENV_FLAG_PAL_MODE;
 #endif /* !USER_ONLY */
+    if (bql) {
+        qemu_mutex_unlock_iothread();
+    }
 }
 
 bool alpha_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
@@ -412,9 +419,11 @@ bool alpha_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     AlphaCPU *cpu = ALPHA_CPU(cs);
     CPUAlphaState *env = &cpu->env;
     int idx = -1;
+    qemu_mutex_lock_iothread();
 
     /* We never take interrupts while in PALmode.  */
     if (env->flags & ENV_FLAG_PAL_MODE) {
+        qemu_mutex_unlock_iothread();
         return false;
     }
 
@@ -446,8 +455,10 @@ bool alpha_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         cs->exception_index = idx;
         env->error_code = 0;
         alpha_cpu_do_interrupt(cs);
+        qemu_mutex_unlock_iothread();
         return true;
     }
+    qemu_mutex_unlock_iothread();
     return false;
 }
 
