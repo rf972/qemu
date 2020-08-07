@@ -90,7 +90,7 @@ void HELPER(write_eiem)(CPUHPPAState *env, target_ureg val)
 }
 #endif /* !CONFIG_USER_ONLY */
 
-void hppa_cpu_do_interrupt(CPUState *cs)
+void hppa_cpu_do_interrupt_locked(CPUState *cs)
 {
     HPPACPU *cpu = HPPA_CPU(cs);
     CPUHPPAState *env = &cpu->env;
@@ -255,7 +255,7 @@ bool hppa_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     /* If interrupts are requested and enabled, raise them.  */
     if ((env->psw & PSW_I) && (interrupt_request & CPU_INTERRUPT_HARD)) {
         cs->exception_index = EXCP_EXT_INTERRUPT;
-        hppa_cpu_do_interrupt(cs);
+        hppa_cpu_do_interrupt_locked(cs);
         return true;
     }
 #endif

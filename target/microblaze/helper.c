@@ -28,7 +28,7 @@
 
 #if defined(CONFIG_USER_ONLY)
 
-void mb_cpu_do_interrupt(CPUState *cs)
+void mb_cpu_do_interrupt_locked(CPUState *cs)
 {
     MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
     CPUMBState *env = &cpu->env;
@@ -108,7 +108,7 @@ bool mb_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     cpu_loop_exit_restore(cs, retaddr);
 }
 
-void mb_cpu_do_interrupt(CPUState *cs)
+void mb_cpu_do_interrupt_locked(CPUState *cs)
 {
     MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
     CPUMBState *env = &cpu->env;
@@ -297,7 +297,7 @@ bool mb_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         && !(env->sregs[SR_MSR] & (MSR_EIP | MSR_BIP))
         && !(env->iflags & (D_FLAG | IMM_FLAG))) {
         cs->exception_index = EXCP_IRQ;
-        mb_cpu_do_interrupt(cs);
+        mb_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;

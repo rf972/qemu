@@ -56,7 +56,7 @@ bool avr_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     return ret;
 }
 
-void avr_cpu_do_interrupt(CPUState *cs)
+void avr_cpu_do_interrupt_locked(CPUState *cs)
 {
     AVRCPU *cpu = AVR_CPU(cs);
     CPUAVRState *env = &cpu->env;

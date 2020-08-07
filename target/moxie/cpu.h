@@ -88,7 +88,7 @@ typedef struct MoxieCPU {
 } MoxieCPU;
 
 
-void moxie_cpu_do_interrupt(CPUState *cs);
+void moxie_cpu_do_interrupt_locked(CPUState *cs);
 void moxie_cpu_dump_state(CPUState *cpu, FILE *f, int flags);
 hwaddr moxie_cpu_get_phys_page_debug(CPUState *cpu, vaddr addr);
 void moxie_translate_init(void);

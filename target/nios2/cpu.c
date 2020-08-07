@@ -106,7 +106,7 @@ static bool nios2_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     if ((interrupt_request & CPU_INTERRUPT_HARD) &&
         (env->regs[CR_STATUS] & CR_STATUS_PIE)) {
         cs->exception_index = EXCP_IRQ;
-        nios2_cpu_do_interrupt(cs);
+        nios2_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;
@@ -192,7 +192,7 @@ static void nios2_cpu_class_init(ObjectClass *oc, void *data)
 
     cc->class_by_name = nios2_cpu_class_by_name;
     cc->has_work = nios2_cpu_has_work;
-    cc->do_interrupt = nios2_cpu_do_interrupt;
+    cc->do_interrupt = nios2_cpu_do_interrupt_locked;
     cc->cpu_exec_interrupt = nios2_cpu_exec_interrupt;
     cc->dump_state = nios2_cpu_dump_state;
     cc->set_pc = nios2_cpu_set_pc;
