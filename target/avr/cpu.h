@@ -156,7 +156,7 @@ typedef struct AVRCPU {
 
 extern const struct VMStateDescription vms_avr_cpu;
 
-void avr_cpu_do_interrupt(CPUState *cpu);
+void avr_cpu_do_interrupt_locked(CPUState *cpu);
 bool avr_cpu_exec_interrupt(CPUState *cpu, int int_req);
 hwaddr avr_cpu_get_phys_page_debug(CPUState *cpu, vaddr addr);
 int avr_cpu_gdb_read_register(CPUState *cpu, GByteArray *buf, int reg);

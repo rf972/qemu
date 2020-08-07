@@ -295,7 +295,7 @@ bool alpha_cpu_tlb_fill(CPUState *cs, vaddr addr, int size,
 }
 #endif /* USER_ONLY */
 
-void alpha_cpu_do_interrupt(CPUState *cs)
+void alpha_cpu_do_interrupt_locked(CPUState *cs)
 {
     AlphaCPU *cpu = ALPHA_CPU(cs);
     CPUAlphaState *env = &cpu->env;
@@ -445,7 +445,7 @@ bool alpha_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     if (idx >= 0) {
         cs->exception_index = idx;
         env->error_code = 0;
-        alpha_cpu_do_interrupt(cs);
+        alpha_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;

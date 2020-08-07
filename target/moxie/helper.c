@@ -95,7 +95,7 @@ bool moxie_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     cpu_loop_exit_restore(cs, retaddr);
 }
 
-void moxie_cpu_do_interrupt(CPUState *cs)
+void moxie_cpu_do_interrupt_locked(CPUState *cs)
 {
     switch (cs->exception_index) {
     case MOXIE_EX_BREAK:

@@ -175,7 +175,7 @@ bool uc32_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 
         if (!(env->uncached_asr & ASR_I)) {
             cs->exception_index = UC32_EXCP_INTR;
-            uc32_cpu_do_interrupt(cs);
+            uc32_cpu_do_interrupt_locked(cs);
             return true;
         }
     }

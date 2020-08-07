@@ -75,7 +75,7 @@ void switch_mode(CPUUniCore32State *env, int mode)
 }
 
 /* Handle a CPU exception.  */
-void uc32_cpu_do_interrupt(CPUState *cs)
+void uc32_cpu_do_interrupt_locked(CPUState *cs)
 {
     UniCore32CPU *cpu = UNICORE32_CPU(cs);
     CPUUniCore32State *env = &cpu->env;

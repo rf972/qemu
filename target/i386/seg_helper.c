@@ -1280,7 +1280,7 @@ static void do_interrupt_all(X86CPU *cpu, int intno, int is_int,
 #endif
 }
 
-void x86_cpu_do_interrupt(CPUState *cs)
+void x86_cpu_do_interrupt_locked(CPUState *cs)
 {
     X86CPU *cpu = X86_CPU(cs);
     CPUX86State *env = &cpu->env;

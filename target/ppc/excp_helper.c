@@ -38,7 +38,7 @@
 /*****************************************************************************/
 /* Exception processing */
 #if defined(CONFIG_USER_ONLY)
-void ppc_cpu_do_interrupt(CPUState *cs)
+void ppc_cpu_do_interrupt_locked(CPUState *cs)
 {
     PowerPCCPU *cpu = POWERPC_CPU(cs);
     CPUPPCState *env = &cpu->env;
@@ -865,7 +865,7 @@ static inline void powerpc_excp(PowerPCCPU *cpu, int excp_model, int excp)
     powerpc_set_excp_state(cpu, vector, new_msr);
 }
 
-void ppc_cpu_do_interrupt(CPUState *cs)
+void ppc_cpu_do_interrupt_locked(CPUState *cs)
 {
     PowerPCCPU *cpu = POWERPC_CPU(cs);
     CPUPPCState *env = &cpu->env;

@@ -65,7 +65,7 @@ static const char *excp_name_str(int32_t exception_index)
     return excp_names[exception_index];
 }
 
-void sparc_cpu_do_interrupt(CPUState *cs)
+void sparc_cpu_do_interrupt_locked(CPUState *cs)
 {
     SPARCCPU *cpu = SPARC_CPU(cs);
     CPUSPARCState *env = &cpu->env;
