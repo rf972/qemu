@@ -105,7 +105,7 @@ static void tilegx_cpu_initfn(Object *obj)
     cpu_set_cpustate_pointers(cpu);
 }
 
-static void tilegx_cpu_do_interrupt(CPUState *cs)
+static void tilegx_cpu_do_interrupt_locked(CPUState *cs)
 {
     cs->exception_index = -1;
 }
@@ -128,7 +128,7 @@ static bool tilegx_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 static bool tilegx_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
-        tilegx_cpu_do_interrupt(cs);
+        tilegx_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;
@@ -147,7 +147,7 @@ static void tilegx_cpu_class_init(ObjectClass *oc, void *data)
 
     cc->class_by_name = tilegx_cpu_class_by_name;
     cc->has_work = tilegx_cpu_has_work;
-    cc->do_interrupt = tilegx_cpu_do_interrupt;
+    cc->do_interrupt = tilegx_cpu_do_interrupt_locked;
     cc->cpu_exec_interrupt = tilegx_cpu_exec_interrupt;
     cc->dump_state = tilegx_cpu_dump_state;
     cc->set_pc = tilegx_cpu_set_pc;

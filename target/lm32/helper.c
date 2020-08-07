@@ -148,7 +148,7 @@ void lm32_debug_excp_handler(CPUState *cs)
     }
 }
 
-void lm32_cpu_do_interrupt(CPUState *cs)
+void lm32_cpu_do_interrupt_locked(CPUState *cs)
 {
     LM32CPU *cpu = LM32_CPU(cs);
     CPULM32State *env = &cpu->env;
@@ -205,7 +205,7 @@ bool lm32_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 
     if ((interrupt_request & CPU_INTERRUPT_HARD) && (env->ie & IE_IE)) {
         cs->exception_index = EXCP_IRQ;
-        lm32_cpu_do_interrupt(cs);
+        lm32_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;

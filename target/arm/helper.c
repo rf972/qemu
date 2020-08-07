@@ -9755,7 +9755,7 @@ static void handle_semihosting(CPUState *cs)
  * to the AArch64-entry or AArch32-entry function depending on the
  * target exception level's register width.
  */
-void arm_cpu_do_interrupt(CPUState *cs)
+void arm_cpu_do_interrupt_locked(CPUState *cs)
 {
     ARMCPU *cpu = ARM_CPU(cs);
     CPUARMState *env = &cpu->env;

@@ -40,7 +40,7 @@
 
 #if defined(CONFIG_USER_ONLY)
 
-void cris_cpu_do_interrupt(CPUState *cs)
+void cris_cpu_do_interrupt_locked(CPUState *cs)
 {
     CRISCPU *cpu = CRIS_CPU(cs);
     CPUCRISState *env = &cpu->env;
@@ -49,9 +49,9 @@ void cris_cpu_do_interrupt(CPUState *cs)
     env->pregs[PR_ERP] = env->pc;
 }
 
-void crisv10_cpu_do_interrupt(CPUState *cs)
+void crisv10_cpu_do_interrupt_locked(CPUState *cs)
 {
-    cris_cpu_do_interrupt(cs);
+    cris_cpu_do_interrupt_locked(cs);
 }
 
 bool cris_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
@@ -123,7 +123,7 @@ bool cris_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     cpu_loop_exit(cs);
 }
 
-void crisv10_cpu_do_interrupt(CPUState *cs)
+void crisv10_cpu_do_interrupt_locked(CPUState *cs)
 {
     CRISCPU *cpu = CRIS_CPU(cs);
     CPUCRISState *env = &cpu->env;
@@ -185,7 +185,7 @@ void crisv10_cpu_do_interrupt(CPUState *cs)
                   env->pregs[PR_ERP]);
 }
 
-void cris_cpu_do_interrupt(CPUState *cs)
+void cris_cpu_do_interrupt_locked(CPUState *cs)
 {
     CRISCPU *cpu = CRIS_CPU(cs);
     CPUCRISState *env = &cpu->env;
