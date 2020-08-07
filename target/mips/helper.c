@@ -1083,7 +1083,7 @@ static inline void set_badinstr_registers(CPUMIPSState *env)
 }
 #endif
 
-void mips_cpu_do_interrupt(CPUState *cs)
+void mips_cpu_do_interrupt_locked(CPUState *cs)
 {
 #if !defined(CONFIG_USER_ONLY)
     MIPSCPU *cpu = MIPS_CPU(cs);
@@ -1409,7 +1409,7 @@ bool mips_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
             /* Raise it */
             cs->exception_index = EXCP_EXT_INTERRUPT;
             env->error_code = 0;
-            mips_cpu_do_interrupt(cs);
+            mips_cpu_do_interrupt_locked(cs);
             return true;
         }
     }

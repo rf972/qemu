@@ -42,7 +42,7 @@ void rx_cpu_unpack_psw(CPURXState *env, uint32_t psw, int rte)
 }
 
 #define INT_FLAGS (CPU_INTERRUPT_HARD | CPU_INTERRUPT_FIR)
-void rx_cpu_do_interrupt(CPUState *cs)
+void rx_cpu_do_interrupt_locked(CPUState *cs)
 {
     RXCPU *cpu = RXCPU(cs);
     CPURXState *env = &cpu->env;
@@ -137,7 +137,7 @@ bool rx_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         accept = 1;
     }
     if (accept) {
-        rx_cpu_do_interrupt(cs);
+        rx_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;

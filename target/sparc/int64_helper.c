@@ -62,7 +62,7 @@ static const char * const excp_names[0x80] = {
 };
 #endif
 
-void sparc_cpu_do_interrupt(CPUState *cs)
+void sparc_cpu_do_interrupt_locked(CPUState *cs)
 {
     SPARCCPU *cpu = SPARC_CPU(cs);
     CPUSPARCState *env = &cpu->env;

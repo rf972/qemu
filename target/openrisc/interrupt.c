@@ -26,7 +26,7 @@
 #include "hw/loader.h"
 #endif
 
-void openrisc_cpu_do_interrupt(CPUState *cs)
+void openrisc_cpu_do_interrupt_locked(CPUState *cs)
 {
 #ifndef CONFIG_USER_ONLY
     OpenRISCCPU *cpu = OPENRISC_CPU(cs);
@@ -115,7 +115,7 @@ bool openrisc_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     }
     if (idx >= 0) {
         cs->exception_index = idx;
-        openrisc_cpu_do_interrupt(cs);
+        openrisc_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;

@@ -85,7 +85,7 @@ bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         int interruptno = riscv_cpu_local_irq_pending(env);
         if (interruptno >= 0) {
             cs->exception_index = RISCV_EXCP_INT_FLAG | interruptno;
-            riscv_cpu_do_interrupt(cs);
+            riscv_cpu_do_interrupt_locked(cs);
             return true;
         }
     }
@@ -820,7 +820,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
  * Adapted from Spike's processor_t::take_trap.
  *
  */
-void riscv_cpu_do_interrupt(CPUState *cs)
+void riscv_cpu_do_interrupt_locked(CPUState *cs)
 {
 #if !defined(CONFIG_USER_ONLY)
 
