@@ -36,6 +36,7 @@
  * @parent_realize: The parent class' realize handler.
  * @parent_reset: The parent class' reset handler.
  * @vr: Version Register value.
+ * @do_interrupt_locked: Handler for interrupts (lock already held).
  *
  * A CRIS CPU model.
  */
@@ -48,6 +49,8 @@ typedef struct CRISCPUClass {
     DeviceReset parent_reset;
 
     uint32_t vr;
+
+    void (*do_interrupt_locked)(CPUState *cpu);
 } CRISCPUClass;
 
 typedef struct CRISCPU CRISCPU;
