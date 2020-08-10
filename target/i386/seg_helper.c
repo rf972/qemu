@@ -1280,7 +1280,7 @@ static void do_interrupt_all(X86CPU *cpu, int intno, int is_int,
 #endif
 }
 
-void x86_cpu_do_interrupt_locked(CPUState *cs)
+static void x86_cpu_do_interrupt_locked(CPUState *cs)
 {
     X86CPU *cpu = X86_CPU(cs);
     CPUX86State *env = &cpu->env;
@@ -1308,6 +1308,13 @@ void x86_cpu_do_interrupt_locked(CPUState *cs)
         env->old_exception = -1;
     }
 #endif
+}
+
+void x86_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    x86_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
 }
 
 void do_interrupt_x86_hardirq(CPUX86State *env, int intno, int is_hw)

@@ -38,6 +38,14 @@
 #define D_LOG(...) do { } while (0)
 #endif
 
+void cris_cpu_do_interrupt(CPUState *cs)
+{
+    CRISCPUClass *acc = CRIS_CPU_GET_CLASS(cs);
+    qemu_mutex_lock_iothread();
+    acc->do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
 #if defined(CONFIG_USER_ONLY)
 
 void cris_cpu_do_interrupt_locked(CPUState *cs)

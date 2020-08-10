@@ -312,3 +312,12 @@ bool nios2_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     cpu_loop_exit_restore(cs, retaddr);
 }
 #endif /* !CONFIG_USER_ONLY */
+
+void nios2_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    nios2_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+

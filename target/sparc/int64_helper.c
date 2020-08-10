@@ -198,6 +198,13 @@ void sparc_cpu_do_interrupt_locked(CPUState *cs)
     cs->exception_index = -1;
 }
 
+void sparc_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    sparc_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
 trap_state *cpu_tsptr(CPUSPARCState* env)
 {
     return &env->ts[env->tl & MAXTL_MASK];
