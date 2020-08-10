@@ -9750,6 +9750,14 @@ static void handle_semihosting(CPUState *cs)
 }
 #endif
 
+void arm_cpu_do_interrupt(CPUState *cs)
+{
+    ARMCPUClass *acc = ARM_CPU_GET_CLASS(cs);
+    qemu_mutex_lock_iothread();
+    acc->do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
 /* Handle a CPU exception for A and R profile CPUs.
  * Do any appropriate logging, handle PSCI calls, and then hand off
  * to the AArch64-entry or AArch32-entry function depending on the

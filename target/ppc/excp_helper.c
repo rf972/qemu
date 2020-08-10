@@ -1428,3 +1428,10 @@ void ppc_cpu_do_unaligned_access(CPUState *cs, vaddr vaddr,
     env->error_code = insn & 0x03FF0000;
     cpu_loop_exit(cs);
 }
+
+void ppc_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    ppc_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
