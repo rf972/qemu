@@ -295,7 +295,7 @@ bool alpha_cpu_tlb_fill(CPUState *cs, vaddr addr, int size,
 }
 #endif /* USER_ONLY */
 
-void alpha_cpu_do_interrupt_locked(CPUState *cs)
+static void alpha_cpu_do_interrupt_locked(CPUState *cs)
 {
     AlphaCPU *cpu = ALPHA_CPU(cs);
     CPUAlphaState *env = &cpu->env;
@@ -405,6 +405,13 @@ void alpha_cpu_do_interrupt_locked(CPUState *cs)
     /* Switch to PALmode.  */
     env->flags |= ENV_FLAG_PAL_MODE;
 #endif /* !USER_ONLY */
+}
+
+void alpha_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    alpha_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
 }
 
 bool alpha_cpu_exec_interrupt(CPUState *cs, int interrupt_request)

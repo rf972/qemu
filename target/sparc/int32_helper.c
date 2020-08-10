@@ -138,6 +138,13 @@ void sparc_cpu_do_interrupt_locked(CPUState *cs)
 #endif
 }
 
+void sparc_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    sparc_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
 #if !defined(CONFIG_USER_ONLY)
 static void leon3_cache_control_int(CPUSPARCState *env)
 {

@@ -26,7 +26,7 @@
 #include "hw/loader.h"
 #endif
 
-void openrisc_cpu_do_interrupt_locked(CPUState *cs)
+static void openrisc_cpu_do_interrupt_locked(CPUState *cs)
 {
 #ifndef CONFIG_USER_ONLY
     OpenRISCCPU *cpu = OPENRISC_CPU(cs);
@@ -99,6 +99,13 @@ void openrisc_cpu_do_interrupt_locked(CPUState *cs)
 #endif
 
     cs->exception_index = -1;
+}
+
+void openrisc_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    openrisc_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
 }
 
 bool openrisc_cpu_exec_interrupt(CPUState *cs, int interrupt_request)

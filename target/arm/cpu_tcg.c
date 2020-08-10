@@ -601,7 +601,7 @@ static void arm_v7m_class_init(ObjectClass *oc, void *data)
 
     acc->info = data;
 #ifndef CONFIG_USER_ONLY
-    cc->do_interrupt = arm_v7m_cpu_do_interrupt_locked;
+    cc->do_interrupt = arm_cpu_do_interrupt;
     acc->do_interrupt_locked = arm_v7m_cpu_do_interrupt_locked;
 #endif
 
