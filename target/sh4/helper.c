@@ -45,7 +45,7 @@
 
 #if defined(CONFIG_USER_ONLY)
 
-void superh_cpu_do_interrupt_locked(CPUState *cs)
+static void superh_cpu_do_interrupt_locked(CPUState *cs)
 {
     cs->exception_index = -1;
 }
@@ -58,7 +58,7 @@ int cpu_sh4_is_cached(CPUSH4State *env, target_ulong addr)
 
 #else /* !CONFIG_USER_ONLY */
 
-void superh_cpu_do_interrupt_locked(CPUState *cs)
+static void superh_cpu_do_interrupt_locked(CPUState *cs)
 {
     SuperHCPU *cpu = SUPERH_CPU(cs);
     CPUSH4State *env = &cpu->env;
@@ -781,6 +781,13 @@ int cpu_sh4_is_cached(CPUSH4State * env, target_ulong addr)
 }
 
 #endif
+
+void superh_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    superh_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
 
 bool superh_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {

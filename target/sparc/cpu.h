@@ -568,6 +568,7 @@ struct SPARCCPU {
 extern const VMStateDescription vmstate_sparc_cpu;
 #endif
 
+void sparc_cpu_do_interrupt(CPUState *cpu);
 void sparc_cpu_do_interrupt_locked(CPUState *cpu);
 void sparc_cpu_dump_state(CPUState *cpu, FILE *f, int flags);
 hwaddr sparc_cpu_get_phys_page_debug(CPUState *cpu, vaddr addr);

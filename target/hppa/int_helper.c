@@ -90,7 +90,7 @@ void HELPER(write_eiem)(CPUHPPAState *env, target_ureg val)
 }
 #endif /* !CONFIG_USER_ONLY */
 
-void hppa_cpu_do_interrupt_locked(CPUState *cs)
+static void hppa_cpu_do_interrupt_locked(CPUState *cs)
 {
     HPPACPU *cpu = HPPA_CPU(cs);
     CPUHPPAState *env = &cpu->env;
@@ -244,6 +244,13 @@ void hppa_cpu_do_interrupt_locked(CPUState *cs)
                                env->cr[CR_IOR]));
     }
     cs->exception_index = -1;
+}
+
+void hppa_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    hppa_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
 }
 
 bool hppa_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
