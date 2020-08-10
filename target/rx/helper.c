@@ -119,6 +119,13 @@ void rx_cpu_do_interrupt_locked(CPUState *cs)
     env->regs[0] = env->isp;
 }
 
+void rx_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    rx_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
 bool rx_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
     RXCPU *cpu = RXCPU(cs);

@@ -24,17 +24,18 @@
 #include "exec/address-spaces.h"
 #include "exec/helper-proto.h"
 
+static void avr_cpu_do_interrupt_locked(CPUState *cs);
+
 bool avr_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
     bool ret = false;
-    CPUClass *cc = CPU_GET_CLASS(cs);
     AVRCPU *cpu = AVR_CPU(cs);
     CPUAVRState *env = &cpu->env;
 
     if (interrupt_request & CPU_INTERRUPT_RESET) {
         if (cpu_interrupts_enabled(env)) {
-            cs->exception_index = EXCP_RESET;
-            cc->do_interrupt(cs);
+            cs->exception_index = EXCP_RESET;            
+            avr_cpu_do_interrupt_locked(cs);
 
             cs->interrupt_request &= ~CPU_INTERRUPT_RESET;
 
@@ -45,7 +46,7 @@ bool avr_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         if (cpu_interrupts_enabled(env) && env->intsrc != 0) {
             int index = ctz32(env->intsrc);
             cs->exception_index = EXCP_INT(index);
-            cc->do_interrupt(cs);
+            avr_cpu_do_interrupt_locked(cs);
 
             env->intsrc &= env->intsrc - 1; /* clear the interrupt */
             cs->interrupt_request &= ~CPU_INTERRUPT_HARD;
@@ -56,7 +57,7 @@ bool avr_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     return ret;
 }
 
-void avr_cpu_do_interrupt_locked(CPUState *cs)
+static void avr_cpu_do_interrupt_locked(CPUState *cs)
 {
     AVRCPU *cpu = AVR_CPU(cs);
     CPUAVRState *env = &cpu->env;
@@ -87,6 +88,13 @@ void avr_cpu_do_interrupt_locked(CPUState *cs)
     env->sregI = 0; /* clear Global Interrupt Flag */
 
     cs->exception_index = -1;
+}
+
+void avr_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    avr_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
 }
 
 int avr_cpu_memory_rw_debug(CPUState *cs, vaddr addr, uint8_t *buf,

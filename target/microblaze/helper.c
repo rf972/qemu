@@ -28,7 +28,7 @@
 
 #if defined(CONFIG_USER_ONLY)
 
-void mb_cpu_do_interrupt_locked(CPUState *cs)
+static void mb_cpu_do_interrupt_locked(CPUState *cs)
 {
     MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
     CPUMBState *env = &cpu->env;
@@ -108,7 +108,7 @@ bool mb_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     cpu_loop_exit_restore(cs, retaddr);
 }
 
-void mb_cpu_do_interrupt_locked(CPUState *cs)
+static void mb_cpu_do_interrupt_locked(CPUState *cs)
 {
     MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
     CPUMBState *env = &cpu->env;
@@ -286,6 +286,13 @@ hwaddr mb_cpu_get_phys_page_debug(CPUState *cs, vaddr addr)
     return paddr;
 }
 #endif
+
+void mb_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    mb_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
 
 bool mb_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
