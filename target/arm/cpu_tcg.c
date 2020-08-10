@@ -17,7 +17,7 @@
 
 static bool arm_v7m_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
-    CPUClass *cc = CPU_GET_CLASS(cs);
+    ARMCPUClass *acc = ARM_CPU_GET_CLASS(cs);
     ARMCPU *cpu = ARM_CPU(cs);
     CPUARMState *env = &cpu->env;
     bool ret = false;
@@ -33,7 +33,7 @@ static bool arm_v7m_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     if (interrupt_request & CPU_INTERRUPT_HARD
         && (armv7m_nvic_can_take_pending_exception(env->nvic))) {
         cs->exception_index = EXCP_IRQ;
-        cc->do_interrupt(cs);
+        acc->do_interrupt_locked(cs);
         ret = true;
     }
     return ret;
@@ -602,6 +602,7 @@ static void arm_v7m_class_init(ObjectClass *oc, void *data)
     acc->info = data;
 #ifndef CONFIG_USER_ONLY
     cc->do_interrupt = arm_v7m_cpu_do_interrupt_locked;
+    acc->do_interrupt_locked = arm_v7m_cpu_do_interrupt_locked;
 #endif
 
     cc->cpu_exec_interrupt = arm_v7m_cpu_exec_interrupt;
