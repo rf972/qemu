@@ -25,6 +25,8 @@
 #include "tcg/tcg-op.h"
 #include "trace.h"
 
+static void riscv_cpu_do_interrupt_locked(CPUState *cs);
+
 int riscv_cpu_mmu_index(CPURISCVState *env, bool ifetch)
 {
 #ifdef CONFIG_USER_ONLY
@@ -814,13 +816,20 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 #endif
 }
 
+void riscv_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    riscv_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
 /*
  * Handle Traps
  *
  * Adapted from Spike's processor_t::take_trap.
  *
  */
-void riscv_cpu_do_interrupt_locked(CPUState *cs)
+static void riscv_cpu_do_interrupt_locked(CPUState *cs)
 {
 #if !defined(CONFIG_USER_ONLY)
 

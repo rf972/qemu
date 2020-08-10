@@ -991,7 +991,9 @@ uint64_t arm_cpu_mp_affinity(int idx, uint8_t clustersz);
 extern const VMStateDescription vmstate_arm_cpu;
 #endif
 
+void arm_cpu_do_interrupt(CPUState *cpu);
 void arm_cpu_do_interrupt_locked(CPUState *cpu);
+void arm_v7m_cpu_do_interrupt(CPUState *cpu);
 void arm_v7m_cpu_do_interrupt_locked(CPUState *cpu);
 bool arm_cpu_exec_interrupt(CPUState *cpu, int int_req);
 

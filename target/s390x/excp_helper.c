@@ -611,3 +611,10 @@ void s390x_cpu_do_unaligned_access(CPUState *cs, vaddr addr,
 }
 
 #endif /* CONFIG_USER_ONLY */
+
+void s390_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    s390_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}

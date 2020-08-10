@@ -120,6 +120,13 @@ void uc32_cpu_do_interrupt_locked(CPUState *cs)
     cpu_interrupt_request_or(cs, CPU_INTERRUPT_EXITTB);
 }
 
+void uc32_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    uc32_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
 static int get_phys_addr_ucv2(CPUUniCore32State *env, uint32_t address,
         int access_type, int is_user, uint32_t *phys_ptr, int *prot,
         target_ulong *page_size)

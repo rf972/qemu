@@ -1231,6 +1231,7 @@ struct PPCVirtualHypervisorClass {
                      TYPE_PPC_VIRTUAL_HYPERVISOR)
 #endif /* CONFIG_USER_ONLY */
 
+void ppc_cpu_do_interrupt(CPUState *cpu);
 void ppc_cpu_do_interrupt_locked(CPUState *cpu);
 bool ppc_cpu_exec_interrupt(CPUState *cpu, int int_req);
 void ppc_cpu_dump_state(CPUState *cpu, FILE *f, int flags);
