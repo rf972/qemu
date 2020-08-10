@@ -148,7 +148,7 @@ void lm32_debug_excp_handler(CPUState *cs)
     }
 }
 
-void lm32_cpu_do_interrupt_locked(CPUState *cs)
+static void lm32_cpu_do_interrupt_locked(CPUState *cs)
 {
     LM32CPU *cpu = LM32_CPU(cs);
     CPULM32State *env = &cpu->env;
@@ -196,6 +196,13 @@ void lm32_cpu_do_interrupt_locked(CPUState *cs)
                   cs->exception_index);
         break;
     }
+}
+
+void lm32_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    lm32_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
 }
 
 bool lm32_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
