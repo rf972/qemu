@@ -126,7 +126,7 @@ void rx_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool rx_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool rx_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     RXCPU *cpu = RXCPU(cs);
     CPURXState *env = &cpu->env;

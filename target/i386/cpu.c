@@ -7298,7 +7298,7 @@ static void x86_cpu_common_class_init(ObjectClass *oc, void *data)
     cc->has_work = x86_cpu_has_work;
 #ifdef CONFIG_TCG
     cc->do_interrupt = x86_cpu_do_interrupt;
-    cc->cpu_exec_interrupt = x86_cpu_exec_interrupt;
+    cc->cpu_exec_interrupt = x86_cpu_exec_interrupt_locked;
 #endif
     cc->dump_state = x86_cpu_dump_state;
     cc->set_pc = x86_cpu_set_pc;

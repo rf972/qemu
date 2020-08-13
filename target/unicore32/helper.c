@@ -167,7 +167,7 @@ void helper_cp1_putc(target_ulong regval)
 }
 #endif /* !CONFIG_USER_ONLY */
 
-bool uc32_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool uc32_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         UniCore32CPU *cpu = UNICORE32_CPU(cs);

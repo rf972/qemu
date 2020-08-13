@@ -511,7 +511,7 @@ void m68k_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool m68k_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool m68k_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     M68kCPU *cpu = M68K_CPU(cs);
     CPUM68KState *env = &cpu->env;

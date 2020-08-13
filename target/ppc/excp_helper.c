@@ -1052,7 +1052,7 @@ void ppc_cpu_do_fwnmi_machine_check(CPUState *cs, target_ulong vector)
 }
 #endif /* !CONFIG_USER_ONLY */
 
-bool ppc_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool ppc_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     PowerPCCPU *cpu = POWERPC_CPU(cs);
     CPUPPCState *env = &cpu->env;
