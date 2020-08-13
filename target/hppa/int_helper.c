@@ -253,7 +253,7 @@ void hppa_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool hppa_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool hppa_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
 #ifndef CONFIG_USER_ONLY
     HPPACPU *cpu = HPPA_CPU(cs);

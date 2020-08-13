@@ -1405,7 +1405,7 @@ void mips_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool mips_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool mips_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         MIPSCPU *cpu = MIPS_CPU(cs);
