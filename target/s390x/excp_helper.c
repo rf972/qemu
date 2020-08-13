@@ -543,7 +543,7 @@ try_deliver:
     }
 }
 
-bool s390_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool s390_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         S390CPU *cpu = S390_CPU(cs);
