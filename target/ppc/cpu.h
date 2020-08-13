@@ -1233,7 +1233,7 @@ struct PPCVirtualHypervisorClass {
 
 void ppc_cpu_do_interrupt(CPUState *cpu);
 void ppc_cpu_do_interrupt_locked(CPUState *cpu);
-bool ppc_cpu_exec_interrupt(CPUState *cpu, int int_req);
+bool ppc_cpu_exec_interrupt_locked(CPUState *cpu, int int_req);
 void ppc_cpu_dump_state(CPUState *cpu, FILE *f, int flags);
 void ppc_cpu_dump_statistics(CPUState *cpu, int flags);
 hwaddr ppc_cpu_get_phys_page_debug(CPUState *cpu, vaddr addr);

@@ -1322,7 +1322,7 @@ void do_interrupt_x86_hardirq(CPUX86State *env, int intno, int is_hw)
     do_interrupt_all(env_archcpu(env), intno, 0, 0, 0, is_hw);
 }
 
-bool x86_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool x86_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     X86CPU *cpu = X86_CPU(cs);
     CPUX86State *env = &cpu->env;

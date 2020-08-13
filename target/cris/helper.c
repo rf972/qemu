@@ -296,7 +296,7 @@ hwaddr cris_cpu_get_phys_page_debug(CPUState *cs, vaddr addr)
 }
 #endif
 
-bool cris_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool cris_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     CRISCPUClass *ccc = CRIS_CPU_CLASS(cs);
     CRISCPU *cpu = CRIS_CPU(cs);
