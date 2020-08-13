@@ -78,7 +78,7 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
 }
 #endif
 
-bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool riscv_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
 #if !defined(CONFIG_USER_ONLY)
     if (interrupt_request & CPU_INTERRUPT_HARD) {

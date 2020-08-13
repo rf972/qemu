@@ -205,7 +205,7 @@ void lm32_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool lm32_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool lm32_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     LM32CPU *cpu = LM32_CPU(cs);
     CPULM32State *env = &cpu->env;

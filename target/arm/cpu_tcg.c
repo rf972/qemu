@@ -15,7 +15,7 @@
 /* CPU models. These are not needed for the AArch64 linux-user build. */
 #if !defined(CONFIG_USER_ONLY) || !defined(TARGET_AARCH64)
 
-static bool arm_v7m_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static bool arm_v7m_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     ARMCPUClass *acc = ARM_CPU_GET_CLASS(cs);
     ARMCPU *cpu = ARM_CPU(cs);
@@ -605,7 +605,7 @@ static void arm_v7m_class_init(ObjectClass *oc, void *data)
     acc->do_interrupt_locked = arm_v7m_cpu_do_interrupt_locked;
 #endif
 
-    cc->cpu_exec_interrupt = arm_v7m_cpu_exec_interrupt;
+    cc->cpu_exec_interrupt = arm_v7m_cpu_exec_interrupt_locked;
     cc->gdb_core_xml_file = "arm-m-profile.xml";
 }
 

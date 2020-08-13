@@ -127,7 +127,7 @@ typedef RXCPU ArchCPU;
 const char *rx_crname(uint8_t cr);
 void rx_cpu_do_interrupt(CPUState *cpu);
 void rx_cpu_do_interrupt_locked(CPUState *cpu);
-bool rx_cpu_exec_interrupt(CPUState *cpu, int int_req);
+bool rx_cpu_exec_interrupt_locked(CPUState *cpu, int int_req);
 void rx_cpu_dump_state(CPUState *cpu, FILE *f, int flags);
 int rx_cpu_gdb_read_register(CPUState *cpu, GByteArray *buf, int reg);
 int rx_cpu_gdb_write_register(CPUState *cpu, uint8_t *buf, int reg);

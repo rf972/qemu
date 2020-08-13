@@ -197,7 +197,7 @@ static void mips_cpu_class_init(ObjectClass *c, void *data)
     cc->class_by_name = mips_cpu_class_by_name;
     cc->has_work_with_iothread_lock = mips_cpu_has_work;
     cc->do_interrupt = mips_cpu_do_interrupt;
-    cc->cpu_exec_interrupt = mips_cpu_exec_interrupt;
+    cc->cpu_exec_interrupt = mips_cpu_exec_interrupt_locked;
     cc->dump_state = mips_cpu_dump_state;
     cc->set_pc = mips_cpu_set_pc;
     cc->synchronize_from_tb = mips_cpu_synchronize_from_tb;

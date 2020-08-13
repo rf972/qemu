@@ -266,7 +266,7 @@ void xtensa_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool xtensa_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool xtensa_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         cs->exception_index = EXC_IRQ;
