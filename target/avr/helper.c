@@ -26,7 +26,7 @@
 
 static void avr_cpu_do_interrupt_locked(CPUState *cs);
 
-bool avr_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+bool avr_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     bool ret = false;
     AVRCPU *cpu = AVR_CPU(cs);
