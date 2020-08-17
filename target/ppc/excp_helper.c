@@ -1052,7 +1052,7 @@ void ppc_cpu_do_fwnmi_machine_check(CPUState *cs, target_ulong vector)
 }
 #endif /* !CONFIG_USER_ONLY */
 
-bool ppc_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
+static bool ppc_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     PowerPCCPU *cpu = POWERPC_CPU(cs);
     CPUPPCState *env = &cpu->env;
@@ -1434,4 +1434,13 @@ void ppc_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_lock_iothread();
     ppc_cpu_do_interrupt_locked(cs);
     qemu_mutex_unlock_iothread();
+}
+
+bool ppc_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = ppc_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }

@@ -205,7 +205,7 @@ void lm32_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool lm32_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
+static bool lm32_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     LM32CPU *cpu = LM32_CPU(cs);
     CPULM32State *env = &cpu->env;
@@ -216,6 +216,15 @@ bool lm32_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
         return true;
     }
     return false;
+}
+
+bool lm32_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = lm32_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 /* Some soc ignores the MSB on the address bus. Thus creating a shadow memory

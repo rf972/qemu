@@ -789,7 +789,8 @@ void superh_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool superh_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
+static bool superh_cpu_exec_interrupt_locked(CPUState *cs,
+                                             int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         SuperHCPU *cpu = SUPERH_CPU(cs);
@@ -804,6 +805,15 @@ bool superh_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
         }
     }
     return false;
+}
+
+bool superh_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = superh_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 bool superh_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
