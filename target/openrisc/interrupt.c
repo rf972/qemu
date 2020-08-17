@@ -108,7 +108,7 @@ void openrisc_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool openrisc_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
+static bool openrisc_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     OpenRISCCPU *cpu = OPENRISC_CPU(cs);
     CPUOpenRISCState *env = &cpu->env;
@@ -126,4 +126,13 @@ bool openrisc_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
         return true;
     }
     return false;
+}
+
+bool openrisc_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = openrisc_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
