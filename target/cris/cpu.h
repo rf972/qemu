@@ -190,7 +190,7 @@ extern const VMStateDescription vmstate_cris_cpu;
 void cris_cpu_do_interrupt(CPUState *cpu);
 void cris_cpu_do_interrupt_locked(CPUState *cpu);
 void crisv10_cpu_do_interrupt_locked(CPUState *cpu);
-bool cris_cpu_exec_interrupt_locked(CPUState *cpu, int int_req);
+bool cris_cpu_exec_interrupt(CPUState *cpu, int int_req);
 
 void cris_cpu_dump_state(CPUState *cs, FILE *f, int flags);
 

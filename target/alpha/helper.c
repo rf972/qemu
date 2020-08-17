@@ -414,7 +414,7 @@ void alpha_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool alpha_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
+static bool alpha_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     AlphaCPU *cpu = ALPHA_CPU(cs);
     CPUAlphaState *env = &cpu->env;
@@ -456,6 +456,15 @@ bool alpha_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
         return true;
     }
     return false;
+}
+
+bool alpha_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = alpha_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 void alpha_cpu_dump_state(CPUState *cs, FILE *f, int flags)
