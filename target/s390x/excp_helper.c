@@ -543,7 +543,7 @@ try_deliver:
     }
 }
 
-bool s390_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
+static bool s390_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         S390CPU *cpu = S390_CPU(cs);
@@ -565,6 +565,15 @@ bool s390_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
         }
     }
     return false;
+}
+
+bool s390_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = s390_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 void s390x_cpu_debug_excp_handler(CPUState *cs)

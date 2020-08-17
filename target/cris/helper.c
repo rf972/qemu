@@ -296,7 +296,7 @@ hwaddr cris_cpu_get_phys_page_debug(CPUState *cs, vaddr addr)
 }
 #endif
 
-bool cris_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
+static bool cris_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     CRISCPUClass *ccc = CRIS_CPU_CLASS(cs);
     CRISCPU *cpu = CRIS_CPU(cs);
@@ -325,4 +325,13 @@ bool cris_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
     }
 
     return ret;
+}
+
+bool cris_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = cris_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }

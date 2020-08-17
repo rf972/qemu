@@ -1405,7 +1405,7 @@ void mips_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool mips_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
+static bool mips_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         MIPSCPU *cpu = MIPS_CPU(cs);
@@ -1421,6 +1421,15 @@ bool mips_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
         }
     }
     return false;
+}
+
+bool mips_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = mips_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 #if !defined(CONFIG_USER_ONLY)
