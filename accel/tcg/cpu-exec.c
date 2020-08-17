@@ -599,7 +599,6 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
            True when it is, and we should restart on a new TB,
            and via longjmp via cpu_loop_exit.  */
         else {
-            qemu_mutex_lock_iothread();
             if (cc->cpu_exec_interrupt(cpu, interrupt_request)) {
                 replay_interrupt();
                 /*
@@ -614,7 +613,6 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
             /* The target hook may have updated the 'cpu->interrupt_request';
              * reload the 'interrupt_request' value */
             interrupt_request = cpu_interrupt_request(cpu);
-            qemu_mutex_unlock_iothread();
         }
         if (interrupt_request & CPU_INTERRUPT_EXITTB) {
             cpu_reset_interrupt(cpu, CPU_INTERRUPT_EXITTB);

@@ -40,6 +40,15 @@ static bool arm_v7m_cpu_exec_interrupt_locked(CPUState *cs,
     return ret;
 }
 
+static bool arm_v7m_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = arm_v7m_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
+}
+
 static void arm926_initfn(Object *obj)
 {
     ARMCPU *cpu = ARM_CPU(obj);
@@ -606,7 +615,7 @@ static void arm_v7m_class_init(ObjectClass *oc, void *data)
     acc->do_interrupt_locked = arm_v7m_cpu_do_interrupt_locked;
 #endif
 
-    cc->cpu_exec_interrupt = arm_v7m_cpu_exec_interrupt_locked;
+    cc->cpu_exec_interrupt = arm_v7m_cpu_exec_interrupt;
     cc->gdb_core_xml_file = "arm-m-profile.xml";
 }
 

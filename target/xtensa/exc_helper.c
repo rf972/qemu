@@ -266,7 +266,8 @@ void xtensa_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool xtensa_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
+static bool xtensa_cpu_exec_interrupt_locked(CPUState *cs,
+                                             int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         cs->exception_index = EXC_IRQ;
@@ -274,4 +275,13 @@ bool xtensa_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
         return true;
     }
     return false;
+}
+
+bool xtensa_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = xtensa_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }

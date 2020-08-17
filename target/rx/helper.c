@@ -126,7 +126,7 @@ void rx_cpu_do_interrupt(CPUState *cs)
     qemu_mutex_unlock_iothread();
 }
 
-bool rx_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
+static bool rx_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     RXCPU *cpu = RXCPU(cs);
     CPURXState *env = &cpu->env;
@@ -148,6 +148,15 @@ bool rx_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
         return true;
     }
     return false;
+}
+
+bool rx_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = rx_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 hwaddr rx_cpu_get_phys_page_debug(CPUState *cs, vaddr addr)
