@@ -26,7 +26,7 @@
 #include "hw/loader.h"
 #endif
 
-void openrisc_cpu_do_interrupt(CPUState *cs)
+static void openrisc_cpu_do_interrupt_locked(CPUState *cs)
 {
 #ifndef CONFIG_USER_ONLY
     OpenRISCCPU *cpu = OPENRISC_CPU(cs);
@@ -101,7 +101,15 @@ void openrisc_cpu_do_interrupt(CPUState *cs)
     cs->exception_index = -1;
 }
 
-bool openrisc_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+void openrisc_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    openrisc_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+static bool openrisc_cpu_exec_interrupt_locked(CPUState *cs,
+                                               int interrupt_request)
 {
     OpenRISCCPU *cpu = OPENRISC_CPU(cs);
     CPUOpenRISCState *env = &cpu->env;
@@ -115,8 +123,17 @@ bool openrisc_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     }
     if (idx >= 0) {
         cs->exception_index = idx;
-        openrisc_cpu_do_interrupt(cs);
+        openrisc_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;
+}
+
+bool openrisc_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = openrisc_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }

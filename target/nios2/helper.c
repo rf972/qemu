@@ -30,7 +30,7 @@
 
 #if defined(CONFIG_USER_ONLY)
 
-void nios2_cpu_do_interrupt(CPUState *cs)
+void nios2_cpu_do_interrupt_locked(CPUState *cs)
 {
     Nios2CPU *cpu = NIOS2_CPU(cs);
     CPUNios2State *env = &cpu->env;
@@ -48,7 +48,7 @@ bool nios2_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 
 #else /* !CONFIG_USER_ONLY */
 
-void nios2_cpu_do_interrupt(CPUState *cs)
+void nios2_cpu_do_interrupt_locked(CPUState *cs)
 {
     Nios2CPU *cpu = NIOS2_CPU(cs);
     CPUNios2State *env = &cpu->env;
@@ -312,3 +312,12 @@ bool nios2_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     cpu_loop_exit_restore(cs, retaddr);
 }
 #endif /* !CONFIG_USER_ONLY */
+
+void nios2_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    nios2_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+

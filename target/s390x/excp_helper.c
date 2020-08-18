@@ -85,7 +85,7 @@ void HELPER(data_exception)(CPUS390XState *env, uint32_t dxc)
 
 #if defined(CONFIG_USER_ONLY)
 
-void s390_cpu_do_interrupt(CPUState *cs)
+void s390_cpu_do_interrupt_locked(CPUState *cs)
 {
     cs->exception_index = -1;
 }
@@ -464,7 +464,7 @@ static void do_mchk_interrupt(CPUS390XState *env)
     load_psw(env, mask, addr);
 }
 
-void s390_cpu_do_interrupt(CPUState *cs)
+void s390_cpu_do_interrupt_locked(CPUState *cs)
 {
     QEMUS390FLICState *flic = QEMU_S390_FLIC(s390_get_flic());
     S390CPU *cpu = S390_CPU(cs);
@@ -543,7 +543,7 @@ try_deliver:
     }
 }
 
-bool s390_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static bool s390_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         S390CPU *cpu = S390_CPU(cs);
@@ -555,7 +555,7 @@ bool s390_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
             return false;
         }
         if (s390_cpu_has_int(cpu)) {
-            s390_cpu_do_interrupt(cs);
+            s390_cpu_do_interrupt_locked(cs);
             return true;
         }
         if (env->psw.mask & PSW_MASK_WAIT) {
@@ -565,6 +565,15 @@ bool s390_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         }
     }
     return false;
+}
+
+bool s390_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = s390_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 void s390x_cpu_debug_excp_handler(CPUState *cs)
@@ -611,3 +620,10 @@ void s390x_cpu_do_unaligned_access(CPUState *cs, vaddr addr,
 }
 
 #endif /* CONFIG_USER_ONLY */
+
+void s390_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    s390_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}

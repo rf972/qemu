@@ -105,7 +105,7 @@ static void tilegx_cpu_initfn(Object *obj)
     cpu_set_cpustate_pointers(cpu);
 }
 
-static void tilegx_cpu_do_interrupt(CPUState *cs)
+static void tilegx_cpu_do_interrupt_locked(CPUState *cs)
 {
     cs->exception_index = -1;
 }
@@ -125,13 +125,30 @@ static bool tilegx_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     cpu_loop_exit_restore(cs, retaddr);
 }
 
-static bool tilegx_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static void tilegx_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    tilegx_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+static bool tilegx_cpu_exec_interrupt_locked(CPUState *cs,
+                                             int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
-        tilegx_cpu_do_interrupt(cs);
+        tilegx_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;
+}
+
+static bool tilegx_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = tilegx_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 static void tilegx_cpu_class_init(ObjectClass *oc, void *data)

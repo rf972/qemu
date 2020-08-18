@@ -2039,7 +2039,7 @@ gen_invep:
     return false;
 }
 
-void arm_v7m_cpu_do_interrupt(CPUState *cs)
+void arm_v7m_cpu_do_interrupt_locked(CPUState *cs)
 {
     ARMCPU *cpu = ARM_CPU(cs);
     CPUARMState *env = &cpu->env;

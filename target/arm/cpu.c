@@ -524,9 +524,9 @@ static inline bool arm_excp_unmasked(CPUState *cs, unsigned int excp_idx,
     return unmasked || pstate_unmasked;
 }
 
-bool arm_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static bool arm_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
-    CPUClass *cc = CPU_GET_CLASS(cs);
+    ARMCPUClass *acc = ARM_CPU_GET_CLASS(cs);
     CPUARMState *env = cs->env_ptr;
     uint32_t cur_el = arm_current_el(env);
     bool secure = arm_is_secure(env);
@@ -573,8 +573,17 @@ bool arm_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
  found:
     cs->exception_index = excp_idx;
     env->exception.target_el = target_el;
-    cc->do_interrupt(cs);
+    acc->do_interrupt_locked(cs);
     return true;
+}
+
+bool arm_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = arm_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 void arm_cpu_update_virq(ARMCPU *cpu)
@@ -2225,6 +2234,7 @@ static void arm_cpu_class_init(ObjectClass *oc, void *data)
     cc->gdb_write_register = arm_cpu_gdb_write_register;
 #ifndef CONFIG_USER_ONLY
     cc->do_interrupt = arm_cpu_do_interrupt;
+    acc->do_interrupt_locked = arm_cpu_do_interrupt_locked;
     cc->get_phys_page_attrs_debug = arm_cpu_get_phys_page_attrs_debug;
     cc->asidx_from_attrs = arm_asidx_from_attrs;
     cc->vmsd = &vmstate_arm_cpu;

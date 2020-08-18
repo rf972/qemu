@@ -25,6 +25,8 @@
 #include "tcg/tcg-op.h"
 #include "trace.h"
 
+static void riscv_cpu_do_interrupt_locked(CPUState *cs);
+
 int riscv_cpu_mmu_index(CPURISCVState *env, bool ifetch)
 {
 #ifdef CONFIG_USER_ONLY
@@ -76,7 +78,7 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
 }
 #endif
 
-bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static bool riscv_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
 #if !defined(CONFIG_USER_ONLY)
     if (interrupt_request & CPU_INTERRUPT_HARD) {
@@ -85,12 +87,21 @@ bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         int interruptno = riscv_cpu_local_irq_pending(env);
         if (interruptno >= 0) {
             cs->exception_index = RISCV_EXCP_INT_FLAG | interruptno;
-            riscv_cpu_do_interrupt(cs);
+            riscv_cpu_do_interrupt_locked(cs);
             return true;
         }
     }
 #endif
     return false;
+}
+
+bool riscv_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = riscv_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 #if !defined(CONFIG_USER_ONLY)
@@ -814,13 +825,20 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 #endif
 }
 
+void riscv_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    riscv_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
 /*
  * Handle Traps
  *
  * Adapted from Spike's processor_t::take_trap.
  *
  */
-void riscv_cpu_do_interrupt(CPUState *cs)
+static void riscv_cpu_do_interrupt_locked(CPUState *cs)
 {
 #if !defined(CONFIG_USER_ONLY)
 

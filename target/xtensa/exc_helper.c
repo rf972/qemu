@@ -195,7 +195,7 @@ static void handle_interrupt(CPUXtensaState *env)
 }
 
 /* Called from cpu_handle_interrupt with BQL held */
-void xtensa_cpu_do_interrupt(CPUState *cs)
+static void xtensa_cpu_do_interrupt_locked(CPUState *cs)
 {
     XtensaCPU *cpu = XTENSA_CPU(cs);
     CPUXtensaState *env = &cpu->env;
@@ -254,17 +254,34 @@ void xtensa_cpu_do_interrupt(CPUState *cs)
     check_interrupts(env);
 }
 #else
-void xtensa_cpu_do_interrupt(CPUState *cs)
+static void xtensa_cpu_do_interrupt_locked(CPUState *cs)
 {
 }
 #endif
 
-bool xtensa_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+void xtensa_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    xtensa_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+static bool xtensa_cpu_exec_interrupt_locked(CPUState *cs,
+                                             int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         cs->exception_index = EXC_IRQ;
-        xtensa_cpu_do_interrupt(cs);
+        xtensa_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;
+}
+
+bool xtensa_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = xtensa_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }

@@ -25,7 +25,7 @@
 
 #if defined(CONFIG_USER_ONLY)
 
-void m68k_cpu_do_interrupt(CPUState *cs)
+static void m68k_cpu_do_interrupt_locked(CPUState *cs)
 {
     cs->exception_index = -1;
 }
@@ -443,7 +443,7 @@ static void do_interrupt_all(CPUM68KState *env, int is_hw)
     cf_interrupt_all(env, is_hw);
 }
 
-void m68k_cpu_do_interrupt(CPUState *cs)
+static void m68k_cpu_do_interrupt_locked(CPUState *cs)
 {
     M68kCPU *cpu = M68K_CPU(cs);
     CPUM68KState *env = &cpu->env;
@@ -504,7 +504,14 @@ void m68k_cpu_transaction_failed(CPUState *cs, hwaddr physaddr, vaddr addr,
 }
 #endif
 
-bool m68k_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+void m68k_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    m68k_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+static bool m68k_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     M68kCPU *cpu = M68K_CPU(cs);
     CPUM68KState *env = &cpu->env;
@@ -522,6 +529,15 @@ bool m68k_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         return true;
     }
     return false;
+}
+
+bool m68k_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = m68k_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 static void raise_exception_ra(CPUM68KState *env, int tt, uintptr_t raddr)

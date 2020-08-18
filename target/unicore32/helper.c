@@ -167,7 +167,7 @@ void helper_cp1_putc(target_ulong regval)
 }
 #endif /* !CONFIG_USER_ONLY */
 
-bool uc32_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static bool uc32_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         UniCore32CPU *cpu = UNICORE32_CPU(cs);
@@ -175,9 +175,18 @@ bool uc32_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 
         if (!(env->uncached_asr & ASR_I)) {
             cs->exception_index = UC32_EXCP_INTR;
-            uc32_cpu_do_interrupt(cs);
+            uc32_cpu_do_interrupt_locked(cs);
             return true;
         }
     }
     return false;
+}
+
+bool uc32_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = uc32_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }

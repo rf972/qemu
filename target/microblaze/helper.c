@@ -28,7 +28,7 @@
 
 #if defined(CONFIG_USER_ONLY)
 
-void mb_cpu_do_interrupt(CPUState *cs)
+static void mb_cpu_do_interrupt_locked(CPUState *cs)
 {
     MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
     CPUMBState *env = &cpu->env;
@@ -108,7 +108,7 @@ bool mb_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     cpu_loop_exit_restore(cs, retaddr);
 }
 
-void mb_cpu_do_interrupt(CPUState *cs)
+static void mb_cpu_do_interrupt_locked(CPUState *cs)
 {
     MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
     CPUMBState *env = &cpu->env;
@@ -287,7 +287,14 @@ hwaddr mb_cpu_get_phys_page_debug(CPUState *cs, vaddr addr)
 }
 #endif
 
-bool mb_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+void mb_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    mb_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+static bool mb_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
     CPUMBState *env = &cpu->env;
@@ -297,8 +304,17 @@ bool mb_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         && !(env->sregs[SR_MSR] & (MSR_EIP | MSR_BIP))
         && !(env->iflags & (D_FLAG | IMM_FLAG))) {
         cs->exception_index = EXCP_IRQ;
-        mb_cpu_do_interrupt(cs);
+        mb_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;
+}
+
+bool mb_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = mb_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }

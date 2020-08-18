@@ -90,7 +90,7 @@ void HELPER(write_eiem)(CPUHPPAState *env, target_ureg val)
 }
 #endif /* !CONFIG_USER_ONLY */
 
-void hppa_cpu_do_interrupt(CPUState *cs)
+static void hppa_cpu_do_interrupt_locked(CPUState *cs)
 {
     HPPACPU *cpu = HPPA_CPU(cs);
     CPUHPPAState *env = &cpu->env;
@@ -246,7 +246,14 @@ void hppa_cpu_do_interrupt(CPUState *cs)
     cs->exception_index = -1;
 }
 
-bool hppa_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+void hppa_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    hppa_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+static bool hppa_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
 #ifndef CONFIG_USER_ONLY
     HPPACPU *cpu = HPPA_CPU(cs);
@@ -255,9 +262,18 @@ bool hppa_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     /* If interrupts are requested and enabled, raise them.  */
     if ((env->psw & PSW_I) && (interrupt_request & CPU_INTERRUPT_HARD)) {
         cs->exception_index = EXCP_EXT_INTERRUPT;
-        hppa_cpu_do_interrupt(cs);
+        hppa_cpu_do_interrupt_locked(cs);
         return true;
     }
 #endif
     return false;
+}
+
+bool hppa_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = hppa_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }

@@ -1083,7 +1083,7 @@ static inline void set_badinstr_registers(CPUMIPSState *env)
 }
 #endif
 
-void mips_cpu_do_interrupt(CPUState *cs)
+static void mips_cpu_do_interrupt_locked(CPUState *cs)
 {
 #if !defined(CONFIG_USER_ONLY)
     MIPSCPU *cpu = MIPS_CPU(cs);
@@ -1398,7 +1398,14 @@ void mips_cpu_do_interrupt(CPUState *cs)
     cs->exception_index = EXCP_NONE;
 }
 
-bool mips_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+void mips_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    mips_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+static bool mips_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         MIPSCPU *cpu = MIPS_CPU(cs);
@@ -1409,11 +1416,20 @@ bool mips_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
             /* Raise it */
             cs->exception_index = EXCP_EXT_INTERRUPT;
             env->error_code = 0;
-            mips_cpu_do_interrupt(cs);
+            mips_cpu_do_interrupt_locked(cs);
             return true;
         }
     }
     return false;
+}
+
+bool mips_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = mips_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 #if !defined(CONFIG_USER_ONLY)

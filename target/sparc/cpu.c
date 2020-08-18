@@ -77,7 +77,7 @@ static void sparc_cpu_reset(DeviceState *dev)
     env->cache_control = 0;
 }
 
-static bool sparc_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static bool sparc_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         SPARCCPU *cpu = SPARC_CPU(cs);
@@ -89,12 +89,21 @@ static bool sparc_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 
             if (type != TT_EXTINT || cpu_pil_allowed(env, pil)) {
                 cs->exception_index = env->interrupt_index;
-                sparc_cpu_do_interrupt(cs);
+                sparc_cpu_do_interrupt_locked(cs);
                 return true;
             }
         }
     }
     return false;
+}
+
+static bool sparc_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = sparc_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 static void cpu_sparc_disas_set_info(CPUState *cpu, disassemble_info *info)

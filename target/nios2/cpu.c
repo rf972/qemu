@@ -98,7 +98,7 @@ static void nios2_cpu_realizefn(DeviceState *dev, Error **errp)
     ncc->parent_realize(dev, errp);
 }
 
-static bool nios2_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static bool nios2_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     Nios2CPU *cpu = NIOS2_CPU(cs);
     CPUNios2State *env = &cpu->env;
@@ -106,10 +106,19 @@ static bool nios2_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     if ((interrupt_request & CPU_INTERRUPT_HARD) &&
         (env->regs[CR_STATUS] & CR_STATUS_PIE)) {
         cs->exception_index = EXCP_IRQ;
-        nios2_cpu_do_interrupt(cs);
+        nios2_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;
+}
+
+static bool nios2_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = nios2_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 

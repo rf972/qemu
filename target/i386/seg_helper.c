@@ -1280,7 +1280,7 @@ static void do_interrupt_all(X86CPU *cpu, int intno, int is_int,
 #endif
 }
 
-void x86_cpu_do_interrupt(CPUState *cs)
+static void x86_cpu_do_interrupt_locked(CPUState *cs)
 {
     X86CPU *cpu = X86_CPU(cs);
     CPUX86State *env = &cpu->env;
@@ -1310,12 +1310,19 @@ void x86_cpu_do_interrupt(CPUState *cs)
 #endif
 }
 
+void x86_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    x86_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
 void do_interrupt_x86_hardirq(CPUX86State *env, int intno, int is_hw)
 {
     do_interrupt_all(env_archcpu(env), intno, 0, 0, 0, is_hw);
 }
 
-bool x86_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static bool x86_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     X86CPU *cpu = X86_CPU(cs);
     CPUX86State *env = &cpu->env;
@@ -1378,6 +1385,15 @@ bool x86_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 
     /* Ensure that no TB jump will be modified as the program flow was changed.  */
     return true;
+}
+
+bool x86_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = x86_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 void helper_lldt(CPUX86State *env, int selector)

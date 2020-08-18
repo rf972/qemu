@@ -65,7 +65,7 @@ static const char *excp_name_str(int32_t exception_index)
     return excp_names[exception_index];
 }
 
-void sparc_cpu_do_interrupt(CPUState *cs)
+void sparc_cpu_do_interrupt_locked(CPUState *cs)
 {
     SPARCCPU *cpu = SPARC_CPU(cs);
     CPUSPARCState *env = &cpu->env;
@@ -136,6 +136,13 @@ void sparc_cpu_do_interrupt(CPUState *cs)
         env->qemu_irq_ack(env, env->irq_manager, intno);
     }
 #endif
+}
+
+void sparc_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    sparc_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
 }
 
 #if !defined(CONFIG_USER_ONLY)

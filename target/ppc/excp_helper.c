@@ -38,7 +38,7 @@
 /*****************************************************************************/
 /* Exception processing */
 #if defined(CONFIG_USER_ONLY)
-void ppc_cpu_do_interrupt(CPUState *cs)
+void ppc_cpu_do_interrupt_locked(CPUState *cs)
 {
     PowerPCCPU *cpu = POWERPC_CPU(cs);
     CPUPPCState *env = &cpu->env;
@@ -865,7 +865,7 @@ static inline void powerpc_excp(PowerPCCPU *cpu, int excp_model, int excp)
     powerpc_set_excp_state(cpu, vector, new_msr);
 }
 
-void ppc_cpu_do_interrupt(CPUState *cs)
+void ppc_cpu_do_interrupt_locked(CPUState *cs)
 {
     PowerPCCPU *cpu = POWERPC_CPU(cs);
     CPUPPCState *env = &cpu->env;
@@ -1052,7 +1052,7 @@ void ppc_cpu_do_fwnmi_machine_check(CPUState *cs, target_ulong vector)
 }
 #endif /* !CONFIG_USER_ONLY */
 
-bool ppc_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static bool ppc_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     PowerPCCPU *cpu = POWERPC_CPU(cs);
     CPUPPCState *env = &cpu->env;
@@ -1427,4 +1427,20 @@ void ppc_cpu_do_unaligned_access(CPUState *cs, vaddr vaddr,
     cs->exception_index = POWERPC_EXCP_ALIGN;
     env->error_code = insn & 0x03FF0000;
     cpu_loop_exit(cs);
+}
+
+void ppc_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    ppc_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+bool ppc_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = ppc_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }

@@ -15,9 +15,10 @@
 /* CPU models. These are not needed for the AArch64 linux-user build. */
 #if !defined(CONFIG_USER_ONLY) || !defined(TARGET_AARCH64)
 
-static bool arm_v7m_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static bool arm_v7m_cpu_exec_interrupt_locked(CPUState *cs,
+                                              int interrupt_request)
 {
-    CPUClass *cc = CPU_GET_CLASS(cs);
+    ARMCPUClass *acc = ARM_CPU_GET_CLASS(cs);
     ARMCPU *cpu = ARM_CPU(cs);
     CPUARMState *env = &cpu->env;
     bool ret = false;
@@ -33,10 +34,19 @@ static bool arm_v7m_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     if (interrupt_request & CPU_INTERRUPT_HARD
         && (armv7m_nvic_can_take_pending_exception(env->nvic))) {
         cs->exception_index = EXCP_IRQ;
-        cc->do_interrupt(cs);
+        acc->do_interrupt_locked(cs);
         ret = true;
     }
     return ret;
+}
+
+static bool arm_v7m_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = arm_v7m_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 static void arm926_initfn(Object *obj)
@@ -601,7 +611,8 @@ static void arm_v7m_class_init(ObjectClass *oc, void *data)
 
     acc->info = data;
 #ifndef CONFIG_USER_ONLY
-    cc->do_interrupt = arm_v7m_cpu_do_interrupt;
+    cc->do_interrupt = arm_cpu_do_interrupt;
+    acc->do_interrupt_locked = arm_v7m_cpu_do_interrupt_locked;
 #endif
 
     cc->cpu_exec_interrupt = arm_v7m_cpu_exec_interrupt;

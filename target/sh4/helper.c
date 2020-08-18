@@ -45,7 +45,7 @@
 
 #if defined(CONFIG_USER_ONLY)
 
-void superh_cpu_do_interrupt(CPUState *cs)
+static void superh_cpu_do_interrupt_locked(CPUState *cs)
 {
     cs->exception_index = -1;
 }
@@ -58,7 +58,7 @@ int cpu_sh4_is_cached(CPUSH4State *env, target_ulong addr)
 
 #else /* !CONFIG_USER_ONLY */
 
-void superh_cpu_do_interrupt(CPUState *cs)
+static void superh_cpu_do_interrupt_locked(CPUState *cs)
 {
     SuperHCPU *cpu = SUPERH_CPU(cs);
     CPUSH4State *env = &cpu->env;
@@ -782,7 +782,15 @@ int cpu_sh4_is_cached(CPUSH4State * env, target_ulong addr)
 
 #endif
 
-bool superh_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+void superh_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    superh_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+static bool superh_cpu_exec_interrupt_locked(CPUState *cs,
+                                             int interrupt_request)
 {
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         SuperHCPU *cpu = SUPERH_CPU(cs);
@@ -792,11 +800,20 @@ bool superh_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         if (env->flags & DELAY_SLOT_MASK) {
             return false;
         } else {
-            superh_cpu_do_interrupt(cs);
+            superh_cpu_do_interrupt_locked(cs);
             return true;
         }
     }
     return false;
+}
+
+bool superh_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = superh_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 bool superh_cpu_tlb_fill(CPUState *cs, vaddr address, int size,

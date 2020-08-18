@@ -295,7 +295,7 @@ bool alpha_cpu_tlb_fill(CPUState *cs, vaddr addr, int size,
 }
 #endif /* USER_ONLY */
 
-void alpha_cpu_do_interrupt(CPUState *cs)
+static void alpha_cpu_do_interrupt_locked(CPUState *cs)
 {
     AlphaCPU *cpu = ALPHA_CPU(cs);
     CPUAlphaState *env = &cpu->env;
@@ -407,7 +407,14 @@ void alpha_cpu_do_interrupt(CPUState *cs)
 #endif /* !USER_ONLY */
 }
 
-bool alpha_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+void alpha_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    alpha_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
+static bool alpha_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
     AlphaCPU *cpu = ALPHA_CPU(cs);
     CPUAlphaState *env = &cpu->env;
@@ -445,10 +452,19 @@ bool alpha_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     if (idx >= 0) {
         cs->exception_index = idx;
         env->error_code = 0;
-        alpha_cpu_do_interrupt(cs);
+        alpha_cpu_do_interrupt_locked(cs);
         return true;
     }
     return false;
+}
+
+bool alpha_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = alpha_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }
 
 void alpha_cpu_dump_state(CPUState *cs, FILE *f, int flags)

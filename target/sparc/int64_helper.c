@@ -62,7 +62,7 @@ static const char * const excp_names[0x80] = {
 };
 #endif
 
-void sparc_cpu_do_interrupt(CPUState *cs)
+void sparc_cpu_do_interrupt_locked(CPUState *cs)
 {
     SPARCCPU *cpu = SPARC_CPU(cs);
     CPUSPARCState *env = &cpu->env;
@@ -196,6 +196,13 @@ void sparc_cpu_do_interrupt(CPUState *cs)
     }
     env->npc = env->pc + 4;
     cs->exception_index = -1;
+}
+
+void sparc_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    sparc_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
 }
 
 trap_state *cpu_tsptr(CPUSPARCState* env)

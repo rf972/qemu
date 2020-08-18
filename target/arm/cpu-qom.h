@@ -48,6 +48,7 @@ void aarch64_cpu_register(const ARMCPUInfo *info);
  * ARMCPUClass:
  * @parent_realize: The parent class' realize handler.
  * @parent_reset: The parent class' reset handler.
+ * @do_interrupt_locked: Handler for interrupts (lock already held).
  *
  * An ARM CPU model.
  */
@@ -59,6 +60,8 @@ typedef struct ARMCPUClass {
     const ARMCPUInfo *info;
     DeviceRealize parent_realize;
     DeviceReset parent_reset;
+
+    void (*do_interrupt_locked)(CPUState *cpu);
 } ARMCPUClass;
 
 typedef struct ARMCPU ARMCPU;

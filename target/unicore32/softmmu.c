@@ -75,7 +75,7 @@ void switch_mode(CPUUniCore32State *env, int mode)
 }
 
 /* Handle a CPU exception.  */
-void uc32_cpu_do_interrupt(CPUState *cs)
+void uc32_cpu_do_interrupt_locked(CPUState *cs)
 {
     UniCore32CPU *cpu = UNICORE32_CPU(cs);
     CPUUniCore32State *env = &cpu->env;
@@ -118,6 +118,13 @@ void uc32_cpu_do_interrupt(CPUState *cs)
     env->regs[30] = env->regs[31];
     env->regs[31] = addr;
     cpu_interrupt_request_or(cs, CPU_INTERRUPT_EXITTB);
+}
+
+void uc32_cpu_do_interrupt(CPUState *cs)
+{
+    qemu_mutex_lock_iothread();
+    uc32_cpu_do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
 }
 
 static int get_phys_addr_ucv2(CPUUniCore32State *env, uint32_t address,

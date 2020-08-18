@@ -38,9 +38,17 @@
 #define D_LOG(...) do { } while (0)
 #endif
 
+void cris_cpu_do_interrupt(CPUState *cs)
+{
+    CRISCPUClass *acc = CRIS_CPU_GET_CLASS(cs);
+    qemu_mutex_lock_iothread();
+    acc->do_interrupt_locked(cs);
+    qemu_mutex_unlock_iothread();
+}
+
 #if defined(CONFIG_USER_ONLY)
 
-void cris_cpu_do_interrupt(CPUState *cs)
+void cris_cpu_do_interrupt_locked(CPUState *cs)
 {
     CRISCPU *cpu = CRIS_CPU(cs);
     CPUCRISState *env = &cpu->env;
@@ -49,9 +57,9 @@ void cris_cpu_do_interrupt(CPUState *cs)
     env->pregs[PR_ERP] = env->pc;
 }
 
-void crisv10_cpu_do_interrupt(CPUState *cs)
+void crisv10_cpu_do_interrupt_locked(CPUState *cs)
 {
-    cris_cpu_do_interrupt(cs);
+    cris_cpu_do_interrupt_locked(cs);
 }
 
 bool cris_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
@@ -123,7 +131,7 @@ bool cris_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     cpu_loop_exit(cs);
 }
 
-void crisv10_cpu_do_interrupt(CPUState *cs)
+void crisv10_cpu_do_interrupt_locked(CPUState *cs)
 {
     CRISCPU *cpu = CRIS_CPU(cs);
     CPUCRISState *env = &cpu->env;
@@ -185,7 +193,7 @@ void crisv10_cpu_do_interrupt(CPUState *cs)
                   env->pregs[PR_ERP]);
 }
 
-void cris_cpu_do_interrupt(CPUState *cs)
+void cris_cpu_do_interrupt_locked(CPUState *cs)
 {
     CRISCPU *cpu = CRIS_CPU(cs);
     CPUCRISState *env = &cpu->env;
@@ -288,9 +296,9 @@ hwaddr cris_cpu_get_phys_page_debug(CPUState *cs, vaddr addr)
 }
 #endif
 
-bool cris_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+static bool cris_cpu_exec_interrupt_locked(CPUState *cs, int interrupt_request)
 {
-    CPUClass *cc = CPU_GET_CLASS(cs);
+    CRISCPUClass *ccc = CRIS_CPU_CLASS(cs);
     CRISCPU *cpu = CRIS_CPU(cs);
     CPUCRISState *env = &cpu->env;
     bool ret = false;
@@ -299,7 +307,7 @@ bool cris_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         && (env->pregs[PR_CCS] & I_FLAG)
         && !env->locked_irq) {
         cs->exception_index = EXCP_IRQ;
-        cc->do_interrupt(cs);
+        ccc->do_interrupt_locked(cs);
         ret = true;
     }
     if (interrupt_request & CPU_INTERRUPT_NMI) {
@@ -311,10 +319,19 @@ bool cris_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         }
         if ((env->pregs[PR_CCS] & m_flag_archval)) {
             cs->exception_index = EXCP_NMI;
-            cc->do_interrupt(cs);
+            ccc->do_interrupt_locked(cs);
             ret = true;
         }
     }
 
     return ret;
+}
+
+bool cris_cpu_exec_interrupt(CPUState *cs, int int_req)
+{
+    bool status;
+    qemu_mutex_lock_iothread();
+    status = cris_cpu_exec_interrupt_locked(cs, int_req);
+    qemu_mutex_unlock_iothread();
+    return status;
 }

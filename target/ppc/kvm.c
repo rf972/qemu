@@ -1650,7 +1650,7 @@ static int kvm_handle_debug(PowerPCCPU *cpu, struct kvm_run *run)
     env->nip += 4;
     cs->exception_index = POWERPC_EXCP_PROGRAM;
     env->error_code = POWERPC_EXCP_INVAL;
-    ppc_cpu_do_interrupt(cs);
+    ppc_cpu_do_interrupt_locked(cs);
 
     return DEBUG_RETURN_GUEST;
 }
